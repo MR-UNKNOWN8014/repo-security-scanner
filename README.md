@@ -49,9 +49,9 @@ chmod +x setup.sh
 - Install all required dependencies
 - Create the run script
 
-
-> [!NOTE]
->  If Python is not in your PATH, the installer will prompt you to install Python 3.8+ from [python.org](https://python.org/).
+>[!TIP]
+>If Python is not in your PATH, the installer will prompt you to install Python 3.8+ from [python.org](https://python.org/).
+ 
 
 ### 1.3 Manual Installation
 
