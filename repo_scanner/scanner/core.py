@@ -74,34 +74,31 @@ class RepoScanner:
     def _get_files_to_scan(self) -> List[Path]:
         if not self.repo_path:
             return []
-        
+
         files_to_scan = []
-        skip_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', 
+        skip_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico',
                           '.mp3', '.mp4', '.avi', '.mov', '.mkv', '.pdf',
                           '.zip', '.tar', '.gz', '.rar', '.7z'}
-        
+        skip_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv',
+                    'dist', 'build', '.idea', '.vscode'}
+
         for root, dirs, files in os.walk(self.repo_path):
-            skip_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', 
-                        'dist', 'build', '.idea', '.vscode'}
             dirs[:] = [d for d in dirs if d not in skip_dirs]
-            
+
             for file in files:
                 file_path = Path(root) / file
-                
+
                 if file_path.suffix.lower() in skip_extensions:
                     continue
-                
+
                 if not self.file_utils.should_scan_file(file_path, self.scan_mode):
                     continue
-                
-                if self.scan_mode == 'quick' and len(files_to_scan) >= MAX_FILES_TO_SCAN:
-                    break
-                
+
                 files_to_scan.append(file_path)
-            
-            if self.scan_mode == 'quick' and len(files_to_scan) >= MAX_FILES_TO_SCAN:
-                break
-        
+
+                if self.scan_mode == 'quick' and len(files_to_scan) >= MAX_FILES_TO_SCAN:
+                    return files_to_scan
+
         return files_to_scan
     
     def _check_dependencies(self):

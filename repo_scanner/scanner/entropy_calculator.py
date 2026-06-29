@@ -23,17 +23,14 @@ class EntropyCalculator:
         return entropy
     
     @staticmethod
-    def calculate_file_entropy(file_path: Path, sample_size: int = 0) -> Optional[float]:
+    def calculate_file_entropy(file_path: Path, sample_size: int = 8192) -> Optional[float]:
         try:
             with open(file_path, 'rb') as f:
-                if sample_size > 0:
-                    data = f.read(sample_size)
-                else:
-                    data = f.read()
-                
+                data = f.read(sample_size)
+
                 if not data:
                     return 0.0
-                
+
                 return EntropyCalculator.calculate_entropy(data)
         except Exception:
             return None

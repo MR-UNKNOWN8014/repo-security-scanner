@@ -8,6 +8,7 @@ class PatternMatcher:
     def __init__(self):
         self.patterns = MALICIOUS_PATTERNS
         self.dangerous_funcs = DANGEROUS_FUNCTIONS
+        self._compile_func_regex()
     
     def detect_malicious_patterns(self, content: str) -> Tuple[float, List[Tuple[str, str]]]:
         risk_score = 0.0
@@ -33,18 +34,28 @@ class PatternMatcher:
         
         return min(risk_score, 100), findings
     
+    def _compile_func_regex(self):
+        self.func_regex = {}
+        for lang, funcs in self.dangerous_funcs.items():
+            patterns = [rf'\b{re.escape(f)}\s*\(' for f in funcs]
+            self.func_regex[lang] = re.compile('|'.join(patterns), re.IGNORECASE)
+
     def detect_dangerous_functions(self, content: str, file_type: str) -> Tuple[float, List[str]]:
         score = 0.0
         found = []
-        
+
         language = self._detect_language(file_type)
-        
-        if language in self.dangerous_funcs:
-            for func in self.dangerous_funcs[language]:
-                if func in content:
-                    found.append(func)
-                    score += 3
-        
+
+        if language in self.func_regex:
+            regex = self.func_regex[language]
+            matches = regex.findall(content)
+            if matches:
+                for func in self.dangerous_funcs.get(language, []):
+                    func_pattern = rf'\b{re.escape(func)}\s*\('
+                    if re.search(func_pattern, content, re.IGNORECASE):
+                        found.append(func)
+                        score += 3
+
         return min(score, 100), found
     
     def detect_base64_encoding(self, content: str) -> Tuple[float, List[str]]:
