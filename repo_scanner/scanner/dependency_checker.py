@@ -28,7 +28,7 @@ class DependencyChecker:
     def _check_package_json(self, file_path: Path) -> Tuple[float, List[Finding]]:
         findings = []
         score = 0.0
-        
+
         risky_npm = {
             'crypto-js': 'Known cryptographic vulnerabilities',
             'node-fetch': 'SSRF vulnerabilities in older versions',
@@ -36,24 +36,25 @@ class DependencyChecker:
             'lodash': 'Prototype pollution vulnerabilities',
             'request': 'Deprecated with known issues'
         }
-        
+
         try:
             with open(file_path, 'r') as f:
                 data = json.load(f)
-                deps = data.get('dependencies', {})
-                
-                for dep in deps:
-                    if dep in risky_npm:
-                        findings.append(Finding(
-                            file_path=str(file_path),
-                            severity="medium",
-                            category="vulnerable_dependency",
-                            description=f"NPM package '{dep}': {risky_npm[dep]}"
-                        ))
-                        score += 15
+                for dep_section in ['dependencies', 'devDependencies']:
+                    deps = data.get(dep_section, {})
+
+                    for dep in deps:
+                        if dep in risky_npm:
+                            findings.append(Finding(
+                                file_path=str(file_path),
+                                severity="medium",
+                                category="vulnerable_dependency",
+                                description=f"NPM package '{dep}' ({dep_section}): {risky_npm[dep]}"
+                            ))
+                            score += 15
         except Exception:
             pass
-        
+
         return score, findings
     
     def _check_requirements_txt(self, file_path: Path) -> Tuple[float, List[Finding]]:

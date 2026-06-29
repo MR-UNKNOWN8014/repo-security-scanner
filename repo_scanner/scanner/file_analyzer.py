@@ -51,9 +51,10 @@ class FileAnalyzer:
                     pattern_score, pattern_findings = self.pattern_matcher.detect_malicious_patterns(content)
                     result.risk_score += pattern_score
                     for category, pattern in pattern_findings:
+                        severity = "high" if category in ['crypto_miner', 'backdoor', 'data_exfiltration'] else "medium" if category == 'obfuscation' else "low"
                         result.findings.append(Finding(
                             file_path=str(file_path),
-                            severity="medium" if pattern_score > 20 else "low",
+                            severity=severity,
                             category=category,
                             description=f"Malicious pattern: {pattern}",
                             pattern=pattern
@@ -76,7 +77,7 @@ class FileAnalyzer:
                     for finding in base64_findings:
                         result.findings.append(Finding(
                             file_path=str(file_path),
-                            severity="medium" if base64_score > 20 else "low",
+                            severity="medium" if "Multiple" in finding or "decode" in finding else "low",
                             category="encoding",
                             description=finding
                         ))
