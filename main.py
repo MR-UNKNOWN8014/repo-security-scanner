@@ -1,8 +1,8 @@
 """Main entry point for repository security scanner"""
 
+import logging
 import sys
-import json
-from colorama import init, Fore, Style
+from colorama import init
 
 from repo_scanner.cli.arguments import parse_arguments
 from repo_scanner.scanner.core import RepoScanner
@@ -25,13 +25,15 @@ def print_banner():
 
 def main():
     args = parse_arguments()
+    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING, format='%(message)s')
     print_banner()
-    
+
     try:
         scanner = RepoScanner(
             repo_url=args.repo_url,
             scan_mode=args.mode,
-            verbose=args.verbose
+            verbose=args.verbose,
+            check_vulns=args.check_vulns
         )
         
         print(f"\nStarting scan...")
@@ -56,11 +58,17 @@ def main():
         
         if args.output:
             exporter = ReportExporter()
-            if args.output.endswith('.json'):
-                exporter.export_json(summary, args.output)
-            elif args.output.endswith('.csv'):
-                exporter.export_csv(summary, args.output)
-            print(f"\nReport saved to: {args.output}")
+            try:
+                if args.output.endswith('.json'):
+                    exporter.export_json(summary, args.output)
+                    print(f"\nReport saved to: {args.output}")
+                elif args.output.endswith('.csv'):
+                    exporter.export_csv(summary, args.output)
+                    print(f"\nReport saved to: {args.output}")
+                else:
+                    print(f"\nUnsupported output format, use .json or .csv: {args.output}")
+            except OSError as e:
+                print(f"\nFailed to save report to {args.output}: {e}")
         
         if not args.auto_decision:
             decision = handle_decision(summary)

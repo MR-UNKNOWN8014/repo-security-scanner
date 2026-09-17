@@ -19,12 +19,12 @@ class ReportExporter:
             for f in summary.findings
         ]
         
-        with open(file_path, 'w') as f:
+        with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
     
     @staticmethod
     def export_csv(summary: ScanSummary, file_path: str):
-        with open(file_path, 'w', newline='') as f:
+        with open(file_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerow(['File', 'Severity', 'Category', 'Description'])
             

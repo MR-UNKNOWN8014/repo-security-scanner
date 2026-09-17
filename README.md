@@ -50,7 +50,7 @@ chmod +x setup.sh
 - Create the run script
 
 >[!TIP]
->If Python is not in your PATH, the installer will prompt you to install Python 3.8+ from [python.org](https://python.org/).
+>If Python is not in your PATH, the installer will prompt you to install Python 3.8+ from [python.org](https://python.org/).
  
 
 ### 1.3 Manual Installation
@@ -67,6 +67,17 @@ venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+```
+
+### 1.4 Install as a Package
+
+The project also ships a `pyproject.toml`, so it can be installed as an editable package instead of running the scripts directly:
+
+```bash
+pip install -e .
+
+# now available as a command anywhere in the venv
+repo-scanner https://github.com/user/repo.git
 ```
 
 ----
@@ -89,6 +100,9 @@ python run_scanner.py https://github.com/user/repo.git --mode thorough --detaile
 
 # Export report to JSON
 python run_scanner.py https://github.com/user/repo.git --output report.json
+
+# Check every pinned dependency against OSV.dev's live vulnerability database
+python run_scanner.py https://github.com/user/repo.git --check-vulns
 ```
 
 ### 2.2 Command Line Arguments
@@ -102,6 +116,7 @@ python run_scanner.py https://github.com/user/repo.git --output report.json
 | `--format`        | -     | Report format: simple, multi, categories, detailed, all (detail below on types) | all      |
 | `--keep-repo`     | -     | Keep cloned repository after scanning                                           | False    |
 | `--auto-decision` | -     | Automatically decide based on risk score                                        | False    |
+| `--check-vulns`   | -     | Query OSV.dev for live known vulnerabilities in every pinned dependency (sends dependency names/versions to a third-party service) | False    |
 
 ### 2.3 Scan Modes
 
@@ -113,7 +128,19 @@ python run_scanner.py https://github.com/user/repo.git --output report.json
 | **Smart**    | Prioritizes executable/script files | Scripts, binaries, executables                                               |
 
 >[!TIP]
->Use `--mode quick` for CI/CD pipelines and `--mode thorough` for security audits.
+>Use `--mode quick` for CI/CD pipelines and `--mode thorough` for security audits.
+
+### 2.4 Ignoring Known False Positives
+
+Drop a `.reposecurityignore` file in the root of the repository being scanned to skip specific files or paths, one glob pattern per line:
+
+```
+# skip test fixtures with fake credentials
+tests/fixtures/*
+*.sample.env
+```
+
+Lines starting with `#` and blank lines are ignored. Patterns match against both the file's path relative to the repo root and its filename.
 
 ----
 ## 3. Report Formats
@@ -247,9 +274,9 @@ TOP FINDINGS:
 
 |Language|Detected Functions|
 |---|---|
-|Python|exec, eval, compile, **import**, os.system, subprocess.call, subprocess.Popen, os.popen|
+|Python|exec, eval, compile, **import**, os.system, subprocess.call, subprocess.Popen, os.popen|
 |JavaScript|eval, Function, setTimeout, setInterval, document.write, innerHTML|
-|Bash|exec, eval, source, ., export, alias|
+|Bash|exec, eval, source, export, alias|
 |PHP|eval, system, exec, passthru, shell_exec, assert|
 |Ruby|eval, exec, system, ``, IO.popen, Open3|
 |Go|os/exec, syscall, reflect, unsafe|
@@ -258,10 +285,14 @@ TOP FINDINGS:
 
 ### 5.3 Vulnerable Dependency Detection
 
-| Package Manager | Detected Packages                                 |
+Offline (default): checks pinned versions of the packages below against a known-bad floor. A package is only flagged if the pinned version is actually below the fixed version; unpinned or unparseable version specs are skipped rather than guessed at.
+
+| Package Manager | Checked Packages                                  |
 | --------------- | ------------------------------------------------- |
 | npm             | crypto-js, node-fetch, axios, lodash, request     |
 | pip             | requests, urllib3, paramiko, cryptography, pyyaml |
+
+Online (`--check-vulns`): additionally queries the [OSV.dev](https://osv.dev/) API for every pinned dependency in `requirements.txt`/`package.json`, not just the packages above, against its live vulnerability database. Off by default since it sends dependency names and versions to a third-party service.
 
 ---
 
@@ -272,15 +303,27 @@ repo-security-scanner/
 ├── setup.sh                 # Linux/macOS installer
 ├── setup.bat                # Windows installer
 ├── requirements.txt         # Python dependencies
+├── pyproject.toml          # Packaging (pip install -e .)
 ├── README.md                # Documentation
 ├── LICENSE                  # MIT License
 ├── .gitignore              # Git ignore file
 ├── run_scanner.py          # Entry point
+├── main.py                 # CLI entry point (main())
+│
+├── .github/
+│   └── workflows/
+│       └── tests.yml       # CI: runs the test suite on push/PR
+│
+├── tests/                   # Unit tests (unittest)
+│   ├── test_entropy_calculator.py
+│   ├── test_pattern_matcher.py
+│   ├── test_dependency_checker.py
+│   ├── test_file_utils.py
+│   └── test_scoring.py
 │
 └── repo_scanner/           # Main package
     ├── __init__.py
     ├── config.py           # Configuration and constants
-    ├── main.py             # Main entry point
     ├── cli/                # Command-line interface
     │   ├── __init__.py
     │   └── arguments.py    # Argument parsing
@@ -290,7 +333,7 @@ repo-security-scanner/
     │   ├── core.py         # Scanner orchestrator
     │   ├── file_analyzer.py # Individual file analysis
     │   ├── pattern_matcher.py # Pattern detection engine
-    │   ├── dependency_checker.py # Dependency scanning
+    │   ├── dependency_checker.py # Dependency scanning (offline + OSV.dev)
     │   └── entropy_calculator.py # Entropy analysis
     │
     ├── report/             # Report generation
@@ -304,7 +347,7 @@ repo-security-scanner/
     │
     └── utils/              # Utility functions
         ├── __init__.py
-        ├── file_utils.py   # File operations
+        ├── file_utils.py   # File operations, .reposecurityignore
         └── git_utils.py    # Git operations
 ```
 
@@ -314,13 +357,13 @@ repo-security-scanner/
 
 |Problem|Check|Solution|
 |---|---|---|
-|Python not found|Python installed?|Install Python 3.8+ from [python.org](https://python.org/)|
-|ModuleNotFoundError|Dependencies installed?|Run `pip install -r requirements.txt`|
-|Git clone failed|Git installed?|Install Git from [git-scm.com](https://git-scm.com/)|
-|Permission denied|File permissions?|`chmod +x setup.sh` (Linux/macOS)|
-|Scan takes too long|Large repository?|Use `--mode quick` or `--mode smart`|
+|Python not found|Python installed?|Install Python 3.8+ from [python.org](https://python.org/)|
+|ModuleNotFoundError|Dependencies installed?|Run `pip install -r requirements.txt`|
+|Git clone failed|Git installed?|Install Git from [git-scm.com](https://git-scm.com/)|
+|Permission denied|File permissions?|`chmod +x setup.sh` (Linux/macOS)|
+|Scan takes too long|Large repository?|Use `--mode quick` or `--mode smart`|
 |Report not generated|Output path valid?|Check write permissions for output directory|
-|High entropy warnings|False positives?|Review the file manually, may be legitimate|
+|High entropy warnings|False positives?|Review the file manually, may be legitimate. Add it to `.reposecurityignore` to suppress it going forward|
 
 ---
 
@@ -342,13 +385,14 @@ repo-security-scanner/
 ### 9.1 Pull Request Process
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/AmazingFeature`
-3. Commit your changes: `git commit -m 'Add some AmazingFeature'`
-4. Push to the branch: `git push origin feature/AmazingFeature`
-5. Submit a Pull Request
+2. Create a feature branch: `git checkout -b feature/AmazingFeature`
+3. Run the test suite locally: `python -m unittest discover -s tests -v`
+4. Commit your changes: `git commit -m 'Add some AmazingFeature'`
+5. Push to the branch: `git push origin feature/AmazingFeature`
+6. Submit a Pull Request
 
 > [!note]  
-> All pull requests must pass the CI checks and maintain 100% compatibility with Python 3.8+.
+> All pull requests must pass the CI checks (.github/workflows/tests.yml, run on Python 3.8 and 3.12) and maintain 100% compatibility with Python 3.8+.
 
 ### 9.2 Reporting Issues
 

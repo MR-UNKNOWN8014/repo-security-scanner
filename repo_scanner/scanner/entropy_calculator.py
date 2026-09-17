@@ -3,6 +3,7 @@
 import math
 from pathlib import Path
 from typing import Optional
+from repo_scanner.config import HIGH_ENTROPY_THRESHOLD
 
 class EntropyCalculator:
     @staticmethod
@@ -39,5 +40,5 @@ class EntropyCalculator:
             return None
     
     @staticmethod
-    def is_high_entropy(entropy: float, threshold: float = 7.5) -> bool:
+    def is_high_entropy(entropy: float, threshold: float = HIGH_ENTROPY_THRESHOLD) -> bool:
         return entropy > threshold

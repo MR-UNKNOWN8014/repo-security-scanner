@@ -23,7 +23,7 @@ Examples:
         help='Scan mode (default: balanced)'
     )
     
-    parser.add_argument('--output', '-o', help='Output report file (JSON)')
+    parser.add_argument('--output', '-o', help='Output report file (.json or .csv)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
     parser.add_argument('--detailed', '-d', action='store_true', help='Show detailed breakdown')
     
@@ -36,5 +36,10 @@ Examples:
     
     parser.add_argument('--keep-repo', action='store_true', help='Keep cloned repo')
     parser.add_argument('--auto-decision', action='store_true', help='Auto-decision based on risk')
+    parser.add_argument(
+        '--check-vulns', action='store_true',
+        help='Query the OSV.dev API for live known vulnerabilities in every pinned dependency '
+             '(sends dependency names/versions to a third-party service; off by default)'
+    )
     
     return parser.parse_args()

@@ -5,7 +5,7 @@ from repo_scanner.models.scan_result import FileScanResult, Finding
 from repo_scanner.scanner.pattern_matcher import PatternMatcher
 from repo_scanner.scanner.entropy_calculator import EntropyCalculator
 from repo_scanner.utils.file_utils import FileUtils
-from repo_scanner.config import MAX_FILE_SIZE_MB
+from repo_scanner.config import MAX_FILE_SIZE_MB, SCORE_ENTROPY
 
 class FileAnalyzer:
     def __init__(self):
@@ -41,7 +41,7 @@ class FileAnalyzer:
                     category="obfuscation",
                     description=f"High entropy: {entropy:.2f} (possible obfuscation)"
                 ))
-                result.risk_score += 20
+                result.risk_score += SCORE_ENTROPY
         
         if not result.is_binary:
             try:
