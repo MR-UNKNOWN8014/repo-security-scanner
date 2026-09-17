@@ -1,5 +1,11 @@
 # Repository Security Scanner
 
+![CI](https://github.com/MR-UNKNOWN8014/repo-security-scanner/actions/workflows/tests.yml/badge.svg)
+![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![PyPI](https://img.shields.io/pypi/v/repo-security-scanner)
+![Stars](https://img.shields.io/github/stars/MR-UNKNOWN8014/repo-security-scanner?style=social)
+
 > A Python-based security tool that analyzes Git repositories for malicious code, backdoors, obfuscation, and suspicious patterns before you clone them. It provides risk scoring and actionable recommendations.
 
 The scanner performs static analysis on repository files, detecting:
@@ -10,6 +16,19 @@ The scanner performs static analysis on repository files, detecting:
 - Dangerous function calls
 - Vulnerable dependencies
 - High-entropy (encrypted/obfuscated) files
+
+---
+
+## Why?
+
+Cloning a repo to audit it is already too late — `postinstall` scripts, 
+Makefiles, and CI configs run before you ever open the code. This tool 
+scans **before** `git clone` completes, so you know what you're pulling 
+in before it can touch your machine.
+
+Built because existing tools (gitleaks, trufflehog) focus on *secrets*, 
+and SAST tools (semgrep, bandit) focus on *your* code. Neither answers 
+the question: "is this random GitHub repo safe to run?"
 
 ---
 
