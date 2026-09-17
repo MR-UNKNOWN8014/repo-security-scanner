@@ -10,6 +10,8 @@ The scanner performs static analysis on repository files, detecting:
 - Dangerous function calls
 - Vulnerable dependencies
 - High-entropy (encrypted/obfuscated) files
+- Hardcoded secrets and API keys
+- Insecure Dockerfile patterns
 
 ---
 
@@ -252,7 +254,9 @@ TOP FINDINGS:
 |Entropy Analysis|20|High entropy indicates encryption/obfuscation|
 |Base64 Encoding|10|Large base64 strings may contain payloads|
 |File Size|10|Large files may contain hidden payloads|
-|Vulnerable Dependencies|15 per package|Known vulnerable packages|
+|Vulnerable Dependencies|15 per package (20 if confirmed via `--check-vulns`)|Known vulnerable packages|
+|Secret Detection|80 per secret|Hardcoded API keys, tokens, passwords, private keys|
+|Dockerfile Issues|3-20 per finding|Unpinned images, root user, curl-pipe-bash, hardcoded secrets|
 
 ---
 
@@ -294,6 +298,25 @@ Offline (default): checks pinned versions of the packages below against a known-
 
 Online (`--check-vulns`): additionally queries the [OSV.dev](https://osv.dev/) API for every pinned dependency in `requirements.txt`/`package.json`, not just the packages above, against its live vulnerability database. Off by default since it sends dependency names and versions to a third-party service.
 
+### 5.4 Secret Detection
+
+Scans every text file for hardcoded credentials: AWS/GitHub/GitLab/Slack/Google/Stripe/Twilio/SendGrid keys, private key blocks, JWTs, and generic `api_key`/`secret`/`token`/`password` assignments. Matches are reported with a file and line number but the value itself is redacted (`AKIA************WXYZ`), never printed in full. Known placeholder values (`EXAMPLE`, `changeme`, `<your_key_here>`, etc.) are filtered out so docs and templates don't trip it. Any confirmed secret pushes that file's risk score into the CRITICAL range on its own.
+
+Add real fixtures containing fake secrets you need to keep to `.reposecurityignore` (see 2.4) to suppress them.
+
+### 5.5 Dockerfile Scanning
+
+Any `Dockerfile`, `Dockerfile.*`, or `*.dockerfile` is additionally checked for:
+
+| Check | What it catches |
+|---|---|
+| Unpinned base image | `FROM image:latest` or no tag at all |
+| Root user | No `USER` instruction, or an explicit `USER root` |
+| ADD vs COPY | `ADD` used for a local file instead of `COPY` (ADD's extra behavior is only needed for URLs/archives) |
+| Pipe to shell | `curl \| bash`, `wget \| sh`, etc. |
+| Insecure TLS | `curl -k`, `--no-check-certificate` |
+| Hardcoded secret | `ENV`/`ARG` setting a `PASSWORD`/`SECRET`/`TOKEN`/`API_KEY` directly |
+
 ---
 
 ## 6. Project Structure
@@ -319,7 +342,9 @@ repo-security-scanner/
 │   ├── test_pattern_matcher.py
 │   ├── test_dependency_checker.py
 │   ├── test_file_utils.py
-│   └── test_scoring.py
+│   ├── test_scoring.py
+│   ├── test_secret_detector.py
+│   └── test_dockerfile_scanner.py
 │
 └── repo_scanner/           # Main package
     ├── __init__.py
@@ -334,7 +359,9 @@ repo-security-scanner/
     │   ├── file_analyzer.py # Individual file analysis
     │   ├── pattern_matcher.py # Pattern detection engine
     │   ├── dependency_checker.py # Dependency scanning (offline + OSV.dev)
-    │   └── entropy_calculator.py # Entropy analysis
+    │   ├── entropy_calculator.py # Entropy analysis
+    │   ├── secret_detector.py # Credential/API key/token detection
+    │   └── dockerfile_scanner.py # Dockerfile security linting
     │
     ├── report/             # Report generation
     │   ├── __init__.py
@@ -369,12 +396,12 @@ repo-security-scanner/
 
 ## 8. Future Enhancements
 
+- [x] Secret detection - API keys, passwords, tokens, credentials
+- [x] Dockerfile scanning - insecure base images, root user, secrets in ENV/ARG, curl-pipe-bash
 - [ ] Git history analysis - scan commit history for secrets and keys
-- [ ] Secret detection - API keys, passwords, tokens, credentials
 - [ ] License checker - detect incompatible or restrictive licenses
 - [ ] Binary signature analysis - verify binaries from trusted sources
 - [ ] Database of known malicious repositories
-- [ ] Docker image scanning
 - [ ] Package registry scanning (PyPI, npm, RubyGems)
 
 

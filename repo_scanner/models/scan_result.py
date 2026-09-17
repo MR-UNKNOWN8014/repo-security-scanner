@@ -19,6 +19,7 @@ class Finding:
     category: str = "unknown"
     description: str = ""
     pattern: Optional[str] = None
+    line: Optional[int] = None
 
 @dataclass
 class FileScanResult:

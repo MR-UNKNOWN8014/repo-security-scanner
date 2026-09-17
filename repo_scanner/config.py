@@ -1,6 +1,6 @@
 """Configuration and constants"""
 
-__version__ = "1.0.0"
+__version__ = "0.1.0"
 
 MALICIOUS_PATTERNS = {
     'crypto_miner': [
@@ -75,3 +75,43 @@ BASE64_MIN_LENGTH = 40
 BASE64_FEW_COUNT = 2
 BASE64_MANY_COUNT = 5
 BASE64_MIN_ENTROPY = 4.5
+
+# name -> regex capturing the credential itself in group 1 (for redaction).
+# Known-bad placeholder values (EXAMPLE keys, "changeme", etc.) are filtered
+# separately in secret_detector.py, not baked into the regex.
+SECRET_PATTERNS = {
+    'AWS Access Key ID': r'(AKIA[0-9A-Z]{16})',
+    'AWS Secret Access Key': r'aws_secret_access_key\s*=\s*["\']?([A-Za-z0-9/+=]{40})["\']?',
+    'GitHub Token': r'(gh[pousr]_[A-Za-z0-9]{36,255})',
+    'GitLab Token': r'(glpat-[A-Za-z0-9\-_]{20})',
+    'Slack Token': r'(xox[baprs]-[A-Za-z0-9-]{10,72})',
+    'Slack Webhook': r'(https://hooks\.slack\.com/services/[A-Za-z0-9/]{20,})',
+    'Google API Key': r'(AIza[0-9A-Za-z\-_]{35})',
+    'Stripe Key': r'((?:sk|pk)_(?:live|test)_[0-9a-zA-Z]{24,})',
+    'Private Key Block': r'(-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----)',
+    'JWT': r'(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})',
+    'Generic API Key Assignment': r'(?i)api[_-]?key\s*[:=]\s*["\']([A-Za-z0-9_\-]{20,})["\']',
+    'Generic Secret Assignment': r'(?i)(?:secret|token)\s*[:=]\s*["\']([A-Za-z0-9_\-]{20,})["\']',
+    'Hardcoded Password': r'(?i)password\s*[:=]\s*["\']([^"\'\s]{8,})["\']',
+    'Twilio API Key': r'(SK[0-9a-fA-F]{32})',
+    'SendGrid API Key': r'(SG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43})',
+}
+
+# these placeholder values are common in docs/tests and are never real secrets
+SECRET_PLACEHOLDER_MARKERS = (
+    'example', 'changeme', 'placeholder', 'xxxxxx', 'your_', 'your-',
+    '<', 'dummy', 'fake', 'test_key', 'sample',
+)
+
+# deliberately high: a single confirmed secret alone should push the file
+# past the CRITICAL threshold (75), not get averaged down by other checks
+SCORE_SECRET_DETECTED = 80
+
+DOCKERFILE_NAME_PATTERNS = ('Dockerfile', 'Dockerfile.*', '*.dockerfile')
+
+SCORE_DOCKER_LATEST_TAG = 5
+SCORE_DOCKER_ROOT_USER = 10
+SCORE_DOCKER_ADD_VS_COPY = 3
+SCORE_DOCKER_PIPE_SHELL = 20
+SCORE_DOCKER_INSECURE_TLS = 10
+SCORE_DOCKER_HARDCODED_SECRET = 15

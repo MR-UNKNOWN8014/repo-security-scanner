@@ -102,7 +102,8 @@ STATISTICS:
                     'low': Fore.GREEN
                 }.get(finding.severity, Fore.WHITE)
                 
-                detailed += f"  {i}. {severity_color}[{finding.severity.upper()}]{Style.RESET_ALL} "
+                location = f"{finding.file_path}:{finding.line} " if finding.line else ""
+                detailed += f"  {i}. {severity_color}[{finding.severity.upper()}]{Style.RESET_ALL} {location}"
                 detailed += f"{finding.category}: {finding.description[:60]}"
                 if len(finding.description) > 60:
                     detailed += "..."

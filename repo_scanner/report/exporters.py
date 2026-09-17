@@ -14,7 +14,8 @@ class ReportExporter:
                 'file': f.file_path,
                 'severity': f.severity,
                 'category': f.category,
-                'description': f.description
+                'description': f.description,
+                'line': f.line
             }
             for f in summary.findings
         ]
@@ -26,11 +27,12 @@ class ReportExporter:
     def export_csv(summary: ScanSummary, file_path: str):
         with open(file_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            writer.writerow(['File', 'Severity', 'Category', 'Description'])
-            
+            writer.writerow(['File', 'Line', 'Severity', 'Category', 'Description'])
+
             for finding in summary.findings:
                 writer.writerow([
                     finding.file_path,
+                    finding.line if finding.line is not None else '',
                     finding.severity,
                     finding.category,
                     finding.description

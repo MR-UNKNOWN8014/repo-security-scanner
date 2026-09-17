@@ -4,15 +4,28 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "repo-security-scanner"
-version = "1.0.0"
-description = "Static analysis scanner that flags malicious code, secrets-adjacent patterns and vulnerable dependencies in a repository before you clone it"
+version = "0.1.0"
+description = "Pre-clone security scanner for Git repositories: malicious code, secrets, vulnerable dependencies, and Dockerfile issues"
 readme = "README.md"
 requires-python = ">=3.8"
-license = { text = "MIT" }
+license = "MIT"
+authors = [{ name = "MR-UNKNOWN8014" }]
+keywords = ["security", "scanner", "malware", "secrets", "supply-chain", "sast", "dockerfile"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
 dependencies = [
     "colorama>=0.4.6",
     "tqdm>=4.64.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/MR-UNKNOWN8014/repo-security-scanner"
+Issues = "https://github.com/MR-UNKNOWN8014/repo-security-scanner/issues"
 
 [project.scripts]
 repo-scanner = "main:main"

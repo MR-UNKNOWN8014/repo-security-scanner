@@ -127,7 +127,8 @@ def handle_decision(summary: ScanSummary) -> bool:
         if choice == '3':
             print("\nDetailed Findings:")
             for i, finding in enumerate(summary.findings[:20], 1):
-                print(f"  {i}. [{finding.severity}] {finding.category}: {finding.description}")
+                location = f"{finding.file_path}:{finding.line} " if finding.line else ""
+                print(f"  {i}. [{finding.severity}] {location}{finding.category}: {finding.description}")
             print("\nWould you like to clone? (yes/no): ")
             return input().lower().startswith('y')
         
