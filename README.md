@@ -23,7 +23,7 @@ The scanner performs static analysis on repository files, detecting:
 
 ## Why?
 
-Cloning a repo to audit it is already too late — `postinstall` scripts, 
+Cloning a repo to audit it is already too late `postinstall` scripts, 
 Makefiles, and CI configs run before you ever open the code. This tool 
 scans **before** `git clone` completes, so you know what you're pulling 
 in before it can touch your machine.
