@@ -3,7 +3,7 @@
 ![CI](https://github.com/MR-UNKNOWN8014/repo-security-scanner/actions/workflows/tests.yml/badge.svg)
 ![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![PyPI](https://img.shields.io/pypi/v/repo-security-scanner)
+![PyPI](https://img.shields.io/pypi/v/repo-security-scanner?cacheSeconds=3600)
 ![Stars](https://img.shields.io/github/stars/MR-UNKNOWN8014/repo-security-scanner?style=social)
 
 Scan a Git repository for malware, backdoors, and sketchy dependencies before you clone it. Static analysis, OSV.dev vulnerability checks, secret detection, entropy analysis, and Dockerfile linting in a single Python CLI.
