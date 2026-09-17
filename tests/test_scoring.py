@@ -51,6 +51,24 @@ class TestSummaryAggregation(unittest.TestCase):
         self.assertTrue(len(self.scanner.repo_name) > 0)
 
 
+class TestCleanup(unittest.TestCase):
+    def setUp(self):
+        # repo_url that is not a local path, so cleanup() treats repo_path as a clone to delete
+        self.scanner = RepoScanner(repo_url='https://example.com/fake/repo.git', scan_mode='balanced')
+        self.fake_clone = tempfile.mkdtemp()
+        self.scanner.repo_path = Path(self.fake_clone)
+
+    def test_cleanup_deletes_the_cloned_dir(self):
+        self.scanner.cleanup()
+        self.assertFalse(Path(self.fake_clone).exists())
+
+    def test_cleanup_is_a_noop_for_local_paths(self):
+        local_scanner = RepoScanner(repo_url=tempfile.gettempdir(), scan_mode='balanced')
+        local_scanner.repo_path = Path(tempfile.gettempdir())
+        local_scanner.cleanup()
+        self.assertTrue(Path(tempfile.gettempdir()).exists())
+
+
 def _finding(severity):
     from repo_scanner.models.scan_result import Finding
     return Finding(file_path='a.py', severity=severity)

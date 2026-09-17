@@ -36,7 +36,7 @@ class RepoScanner:
         self.results: List[FileScanResult] = []
         self.summary: Optional[ScanSummary] = None
 
-    def scan(self, keep_repo: bool = False) -> ScanSummary:
+    def scan(self, keep_repo: bool = False, auto_cleanup: bool = True) -> ScanSummary:
         start_time = datetime.now()
 
         if self.file_utils.is_local_path(self.repo_url):
@@ -58,11 +58,16 @@ class RepoScanner:
             self.summary = self._generate_summary(start_time)
             return self.summary
         finally:
-            if not keep_repo and not self.file_utils.is_local_path(self.repo_url):
-                try:
-                    self.file_utils.force_rmtree(self.repo_path)
-                except Exception:
-                    pass
+            if auto_cleanup and not keep_repo:
+                self.cleanup()
+
+    def cleanup(self):
+        """Delete the cloned temp repo, if any. No-op for local paths or if already cleaned up."""
+        if self.repo_path and not self.file_utils.is_local_path(self.repo_url):
+            try:
+                self.file_utils.force_rmtree(self.repo_path)
+            except Exception:
+                pass
 
     def _scan_files(self):
         if not self.repo_path:

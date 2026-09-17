@@ -67,6 +67,40 @@ class TestDockerfileScanner(unittest.TestCase):
         score, findings = self.scanner.scan(content)
         self.assertEqual(findings, [])
 
+    def test_multistage_build_reference_is_not_flagged_as_unpinned(self):
+        # a later "FROM builder" refers to an earlier stage alias, not an
+        # external image, and should not need a version pin
+        content = (
+            'FROM python:3.12-slim AS builder\n'
+            'RUN pip install .\n'
+            'FROM builder\n'
+            'USER app\n'
+        )
+        score, findings = self.scanner.scan(content)
+        self.assertFalse(any(f[0] == 'unpinned_base_image' for f in findings))
+
+    def test_add_with_chown_flag_and_url_is_not_flagged(self):
+        content = 'FROM python:3.12-slim\nUSER app\nADD --chown=app:app https://example.com/f.tar.gz /app/\n'
+        score, findings = self.scanner.scan(content)
+        self.assertFalse(any(f[0] == 'add_vs_copy' for f in findings))
+
+    def test_secret_in_second_position_on_multi_var_env_line_is_flagged(self):
+        content = 'FROM python:3.12-slim\nUSER app\nENV FOO=bar DB_PASSWORD=supersecret123\n'
+        score, findings = self.scanner.scan(content)
+        self.assertTrue(any(f[0] == 'hardcoded_secret' for f in findings))
+
+    def test_numeric_root_uid_is_flagged(self):
+        score, findings = self.scanner.scan('FROM python:3.12-slim\nUSER 0\n')
+        self.assertTrue(any(f[0] == 'root_user' and f[1] == 'Explicitly runs as root' for f in findings))
+
+    def test_numeric_root_uid_with_gid_is_flagged(self):
+        score, findings = self.scanner.scan('FROM python:3.12-slim\nUSER 0:0\n')
+        self.assertTrue(any(f[0] == 'root_user' and f[1] == 'Explicitly runs as root' for f in findings))
+
+    def test_nonzero_numeric_uid_is_not_flagged_as_root(self):
+        score, findings = self.scanner.scan('FROM python:3.12-slim\nUSER 1000\n')
+        self.assertFalse(any(f[0] == 'root_user' and f[1] == 'Explicitly runs as root' for f in findings))
+
 
 if __name__ == '__main__':
     unittest.main()

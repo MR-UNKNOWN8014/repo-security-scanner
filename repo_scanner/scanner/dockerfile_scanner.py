@@ -10,14 +10,15 @@ from repo_scanner.config import (
     SCORE_DOCKER_PIPE_SHELL, SCORE_DOCKER_INSECURE_TLS, SCORE_DOCKER_HARDCODED_SECRET,
 )
 
-_FROM_RE = re.compile(r'^\s*FROM\s+(\S+)', re.IGNORECASE)
-_ADD_RE = re.compile(r'^\s*ADD\s+(\S+)', re.IGNORECASE)
-_USER_ROOT_RE = re.compile(r'^\s*USER\s+root\b', re.IGNORECASE)
+_FROM_RE = re.compile(r'^\s*FROM\s+(\S+)(?:\s+AS\s+(\S+))?', re.IGNORECASE)
+_ADD_RE = re.compile(r'^\s*ADD\s+(?:--\S+\s+)*(\S+)', re.IGNORECASE)
+_USER_ROOT_RE = re.compile(r'^\s*USER\s+(root|0)(:\S+)?\b', re.IGNORECASE)
 _USER_RE = re.compile(r'^\s*USER\s+\S+', re.IGNORECASE)
 _PIPE_SHELL_RE = re.compile(r'(curl|wget)\s+.*\|\s*(sudo\s+)?(sh|bash)\b', re.IGNORECASE)
 _INSECURE_TLS_RE = re.compile(r'--no-check-certificate|curl\s+.*(-k\b|--insecure)', re.IGNORECASE)
+_ENV_ARG_LINE_RE = re.compile(r'^\s*(?:ENV|ARG)\s+(.*)$', re.IGNORECASE)
 _HARDCODED_SECRET_RE = re.compile(
-    r'(?i)^\s*(?:ENV|ARG)\s+\w*(?:PASSWORD|SECRET|TOKEN|API_KEY)\w*[= ]+(\S{8,})'
+    r'(?i)\w*(?:PASSWORD|SECRET|TOKEN|API_KEY)\w*\s*[= ]\s*(\S{8,})'
 )
 
 
@@ -30,14 +31,23 @@ class DockerfileScanner:
         score = 0.0
         findings = []
         has_user_instruction = False
+        stage_names = set()
 
         for line_number, line in enumerate(content.split('\n'), start=1):
             from_match = _FROM_RE.match(line)
             if from_match:
                 image = from_match.group(1)
-                if image.lower() not in ('scratch',) and (':' not in image or image.endswith(':latest')):
+                alias = from_match.group(2)
+                is_stage_reference = image.lower() in stage_names
+                if (
+                    image.lower() not in ('scratch',)
+                    and not is_stage_reference
+                    and (':' not in image or image.endswith(':latest'))
+                ):
                     findings.append(('unpinned_base_image', f'Base image not pinned to a specific version: {image}', line_number))
                     score += SCORE_DOCKER_LATEST_TAG
+                if alias:
+                    stage_names.add(alias.lower())
 
             if _USER_ROOT_RE.match(line):
                 has_user_instruction = True
@@ -63,8 +73,8 @@ class DockerfileScanner:
                 findings.append(('insecure_tls', 'Disables TLS certificate verification', line_number))
                 score += SCORE_DOCKER_INSECURE_TLS
 
-            secret_match = _HARDCODED_SECRET_RE.match(line)
-            if secret_match:
+            env_match = _ENV_ARG_LINE_RE.match(line)
+            if env_match and _HARDCODED_SECRET_RE.search(env_match.group(1)):
                 findings.append(('hardcoded_secret', 'Hardcoded credential in ENV/ARG instruction', line_number))
                 score += SCORE_DOCKER_HARDCODED_SECRET
 

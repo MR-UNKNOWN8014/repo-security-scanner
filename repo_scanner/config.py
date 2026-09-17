@@ -1,6 +1,6 @@
 """Configuration and constants"""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 MALICIOUS_PATTERNS = {
     'crypto_miner': [

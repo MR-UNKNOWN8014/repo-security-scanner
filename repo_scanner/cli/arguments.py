@@ -34,8 +34,12 @@ Examples:
         help='Report format (default: all)'
     )
     
-    parser.add_argument('--keep-repo', action='store_true', help='Keep cloned repo')
-    parser.add_argument('--auto-decision', action='store_true', help='Auto-decision based on risk')
+    parser.add_argument(
+        '--keep-repo', action='store_true',
+        help='Keep the cloned repo after scanning instead of deleting it. '
+             'Only takes effect with --auto-decision; in interactive mode your answer decides instead.'
+    )
+    parser.add_argument('--auto-decision', action='store_true', help='Skip the interactive prompt, decide based on risk score and --keep-repo')
     parser.add_argument(
         '--check-vulns', action='store_true',
         help='Query the OSV.dev API for live known vulnerabilities in every pinned dependency '
