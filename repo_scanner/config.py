@@ -1,6 +1,12 @@
 """Configuration and constants"""
 
-__version__ = "0.1.1"
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("repo-security-scanner")
+except PackageNotFoundError:
+    # running from a source checkout that was never pip installed
+    __version__ = "0.0.0+source"
 
 MALICIOUS_PATTERNS = {
     'crypto_miner': [
@@ -36,6 +42,20 @@ DANGEROUS_FUNCTIONS = {
     'php': ['eval', 'system', 'exec', 'passthru', 'shell_exec', 'assert']
 }
 
+# findings with this severity are best practice notes: never scored, reported separately
+CAUTION_SEVERITY = "info"
+
+# categories routed to cautions instead of findings. Hygiene and reproducibility
+# issues, not exploitable ones. Anything exploitable stays a scored finding.
+CAUTION_CATEGORIES = {
+    'long_line',
+    'network',
+    'size',
+    'error',
+    'dockerfile_unpinned_base_image',
+    'dockerfile_add_vs_copy',
+}
+
 HIGH_ENTROPY_THRESHOLD = 7.5
 MAX_FILE_SIZE_MB = 50
 MAX_FILES_TO_SCAN = 10000
@@ -58,8 +78,6 @@ RISK_THRESHOLDS = {
 
 # risk score point values, centralized so scoring logic isn't scattered magic numbers
 SCORE_PATTERN_MATCH = 5
-SCORE_LONG_LINE = 3
-SCORE_EXTREMELY_LONG_LINE = 10
 SCORE_DANGEROUS_FUNCTION = 3
 SCORE_ENTROPY = 20
 SCORE_BASE64_FEW = 5
@@ -109,9 +127,7 @@ SCORE_SECRET_DETECTED = 80
 
 DOCKERFILE_NAME_PATTERNS = ('Dockerfile', 'Dockerfile.*', '*.dockerfile')
 
-SCORE_DOCKER_LATEST_TAG = 5
 SCORE_DOCKER_ROOT_USER = 10
-SCORE_DOCKER_ADD_VS_COPY = 3
 SCORE_DOCKER_PIPE_SHELL = 20
 SCORE_DOCKER_INSECURE_TLS = 10
 SCORE_DOCKER_HARDCODED_SECRET = 15

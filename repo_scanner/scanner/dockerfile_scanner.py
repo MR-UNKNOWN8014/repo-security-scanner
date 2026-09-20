@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 from repo_scanner.config import (
     DOCKERFILE_NAME_PATTERNS,
-    SCORE_DOCKER_LATEST_TAG, SCORE_DOCKER_ROOT_USER, SCORE_DOCKER_ADD_VS_COPY,
+    SCORE_DOCKER_ROOT_USER,
     SCORE_DOCKER_PIPE_SHELL, SCORE_DOCKER_INSECURE_TLS, SCORE_DOCKER_HARDCODED_SECRET,
 )
 
@@ -44,8 +44,8 @@ class DockerfileScanner:
                     and not is_stage_reference
                     and (':' not in image or image.endswith(':latest'))
                 ):
+                    # caution, not scored: reproducibility hygiene, not exploitable
                     findings.append(('unpinned_base_image', f'Base image not pinned to a specific version: {image}', line_number))
-                    score += SCORE_DOCKER_LATEST_TAG
                 if alias:
                     stage_names.add(alias.lower())
 
@@ -62,8 +62,8 @@ class DockerfileScanner:
                 is_url = source.startswith(('http://', 'https://'))
                 is_archive = source.endswith(('.tar', '.tar.gz', '.tgz', '.tar.bz2', '.zip'))
                 if not is_url and not is_archive:
+                    # caution, not scored: style preference, not exploitable
                     findings.append(('add_vs_copy', 'ADD used where COPY would suffice (no auto-extraction/URL fetch needed)', line_number))
-                    score += SCORE_DOCKER_ADD_VS_COPY
 
             if _PIPE_SHELL_RE.search(line):
                 findings.append(('pipe_to_shell', 'Pipes a remote download directly into a shell', line_number))

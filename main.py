@@ -64,14 +64,17 @@ def main():
         if args.output:
             exporter = ReportExporter()
             try:
-                if args.output.endswith('.json'):
+                if args.output.endswith('.sarif'):
+                    exporter.export_sarif(summary, args.output)
+                    print(f"\nReport saved to: {args.output}")
+                elif args.output.endswith('.json'):
                     exporter.export_json(summary, args.output)
                     print(f"\nReport saved to: {args.output}")
                 elif args.output.endswith('.csv'):
                     exporter.export_csv(summary, args.output)
                     print(f"\nReport saved to: {args.output}")
                 else:
-                    print(f"\nUnsupported output format, use .json or .csv: {args.output}")
+                    print(f"\nUnsupported output format, use .json, .csv or .sarif: {args.output}")
             except OSError as e:
                 print(f"\nFailed to save report to {args.output}: {e}")
         
@@ -148,8 +151,10 @@ def handle_decision(summary: ScanSummary, is_local: bool) -> bool:
         if choice == '3':
             print("\nDetailed Findings:")
             for i, finding in enumerate(summary.findings[:20], 1):
-                location = f"{finding.file_path}:{finding.line} " if finding.line else ""
-                print(f"  {i}. [{finding.severity}] {location}{finding.category}: {finding.description}")
+                location = f"{finding.file_path}:{finding.line}" if finding.line is not None else finding.file_path
+                print(f"  {i}. [{finding.severity}] {location} {finding.category}: {finding.description}")
+            if summary.cautions:
+                print(f"\nPlus {len(summary.cautions)} best practice cautions, not scored. See the detailed report.")
             response = input(f"\nWould you like to {action} this repository? (yes/no): ").lower()
             return response.startswith('y')
 
