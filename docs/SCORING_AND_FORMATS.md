@@ -31,6 +31,7 @@ Scores run from 0 to 100. Higher means more risk. The score aggregates weighted 
 | Dangerous functions     | 100                                                       | eval, exec, system, subprocess, and language equivalents            |
 | Entropy analysis        | 20                                                        | High entropy suggests encryption or obfuscation                     |
 | Base64 encoding         | 10                                                        | Large base64 blocks may hide payloads                               |
+| Long lines              | 0 (caution)                                               | Reported as a caution with a line number, never scored, see below   |
 | File size               | 10                                                        | Unusually large files can conceal appended payloads                 |
 | Vulnerable dependencies | 15 per package (20 if confirmed live via `--check-vulns`) | Pinned versions below a known-bad floor, or matched against OSV.dev |
 | Secret detection        | 80 per secret                                             | Any confirmed hardcoded credential                                  |
@@ -43,6 +44,12 @@ Each factor contributes independently, but they are not equally important.
 Malicious patterns and dangerous functions are the heavy hitters. A single confirmed backdoor signature can push a repository into HIGH or CRITICAL on its own. Secret detection is a near-instant CRITICAL: 80 points from one hardcoded AWS key usually lands the file in the top band.
 
 Entropy, base64, and file size are secondary signals. They rarely push a score past LOW by themselves, but they stack when a file looks suspicious in multiple ways. A file with high entropy, a large base64 blob, and an odd size is far more interesting than any one of those alone.
+
+Long lines are the exception. They are reported as **cautions**, not findings: severity `info`, zero points, on every file type. A 1200 character line is normal in a prose paragraph, a minified asset, or a single-line JSON fixture, so scoring it produced false positives on docs and data files.
+
+Cautions live in their own list (`summary.cautions`), print under a separate `CAUTIONS` heading in the detailed report, and are counted separately from findings. They cannot move the risk score and cannot crowd real findings out of the report. In JSON export they are a separate `cautions` array; in CSV they are appended with severity `info`.
+
+Any check marked with `CAUTION_SEVERITY` in `config.py` is routed this way, so moving a check between "finding" and "caution" is a one word change.
 
 Vulnerable dependencies and Dockerfile issues are additive per finding. A Dockerfile with three separate issues (unpinned base image, root user, curl pipe bash) accumulates all three penalties. Ten vulnerable npm packages at 15 points each is 150 points before anything else is considered. That is why dependency hygiene matters.
 
@@ -182,4 +189,20 @@ repo-scanner https://github.com/user/repo.git --output report.json
 repo-scanner https://github.com/user/repo.git --output report.csv
 ```
 
-JSON includes the full finding list with file paths, line numbers, categories, and severities. CSV flattens the same data into rows for spreadsheet review or downstream parsing.
+JSON includes the full finding list with file paths, line numbers, categories, and severities, plus a separate `cautions` array. CSV flattens both into rows for spreadsheet review or downstream parsing.
+
+### SARIF export
+
+```bash
+repo-scanner https://github.com/user/repo.git --output results.sarif
+```
+
+Writes SARIF 2.1.0, which GitHub Code Scanning renders natively in the Security tab. Each finding category becomes a rule, each finding a result, with the line number as a `region.startLine`. Severity maps as `critical`/`high` to `error`, `medium` to `warning`, `low`/`info` to `note`. Cautions are included as notes. Paths are normalized to forward slashes so GitHub can match them to repo files.
+
+Upload it from a workflow:
+
+```yaml
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: results.sarif
+```

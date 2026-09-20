@@ -19,6 +19,10 @@ def _parse_version(version: str) -> Optional[Tuple[int, ...]]:
     except ValueError:
         return None
 
+def _line_of_key(text: str, key: str) -> Optional[int]:
+    index = text.find(f'"{key}"')
+    return text.count('\n', 0, index) + 1 if index != -1 else None
+
 def _query_osv(name: str, version: str, ecosystem: str) -> List[dict]:
     payload = json.dumps({
         'package': {'name': name, 'ecosystem': ecosystem},
@@ -64,29 +68,31 @@ class DependencyChecker:
         }
 
         try:
-            with open(file_path, 'r') as f:
-                data = json.load(f)
-                deps = data.get('dependencies', {})
+            text = Path(file_path).read_text(encoding='utf-8', errors='ignore')
+            data = json.loads(text)
+            deps = data.get('dependencies', {})
 
-                checked = 0
-                for dep, pinned in deps.items():
-                    version_str = str(pinned).lstrip('^~=')
-                    version = _parse_version(version_str)
+            checked = 0
+            for dep, pinned in deps.items():
+                version_str = str(pinned).lstrip('^~=')
+                version = _parse_version(version_str)
+                line = _line_of_key(text, dep)
 
-                    if dep in risky_npm:
-                        floor, reason = risky_npm[dep]
-                        if version is not None and version < _parse_version(floor):
-                            findings.append(Finding(
-                                file_path=str(file_path),
-                                severity="medium",
-                                category="vulnerable_dependency",
-                                description=f"NPM package '{dep}': {reason}"
-                            ))
-                            score += SCORE_VULNERABLE_DEPENDENCY
+                if dep in risky_npm:
+                    floor, reason = risky_npm[dep]
+                    if version is not None and version < _parse_version(floor):
+                        findings.append(Finding(
+                            file_path=str(file_path),
+                            severity="medium",
+                            category="vulnerable_dependency",
+                            description=f"NPM package '{dep}': {reason}",
+                            line=line
+                        ))
+                        score += SCORE_VULNERABLE_DEPENDENCY
 
-                    if online and version is not None and checked < OSV_MAX_PACKAGES:
-                        checked += 1
-                        score += self._check_osv(dep, version_str, 'npm', file_path, findings)
+                if online and version is not None and checked < OSV_MAX_PACKAGES:
+                    checked += 1
+                    score += self._check_osv(dep, version_str, 'npm', file_path, findings, line)
         except Exception:
             pass
 
@@ -108,8 +114,8 @@ class DependencyChecker:
         try:
             with open(file_path, 'r') as f:
                 checked = 0
-                for line in f:
-                    line = line.strip()
+                for line_number, raw_line in enumerate(f, start=1):
+                    line = raw_line.strip()
                     if not line or line.startswith('#'):
                         continue
 
@@ -127,19 +133,20 @@ class DependencyChecker:
                                 file_path=str(file_path),
                                 severity="medium",
                                 category="vulnerable_dependency",
-                                description=f"Python package '{package}' pinned to {pinned}: {reason} (fixed in {floor})"
+                                description=f"Python package '{package}' pinned to {pinned}: {reason} (fixed in {floor})",
+                                line=line_number
                             ))
                             score += SCORE_VULNERABLE_DEPENDENCY
 
                     if online and pinned and version is not None and checked < OSV_MAX_PACKAGES:
                         checked += 1
-                        score += self._check_osv(package, pinned, 'PyPI', file_path, findings)
+                        score += self._check_osv(package, pinned, 'PyPI', file_path, findings, line_number)
         except Exception:
             pass
 
         return score, findings
 
-    def _check_osv(self, name: str, version: str, ecosystem: str, file_path: Path, findings: List[Finding]) -> float:
+    def _check_osv(self, name: str, version: str, ecosystem: str, file_path: Path, findings: List[Finding], line: Optional[int] = None) -> float:
         # best-effort live lookup: network failures just mean no extra findings
         try:
             vulns = _query_osv(name, version, ecosystem)
@@ -154,7 +161,8 @@ class DependencyChecker:
                 file_path=str(file_path),
                 severity="high",
                 category="vulnerable_dependency",
-                description=f"{ecosystem} package '{name}' {version}: {vuln_id} - {summary}"
+                description=f"{ecosystem} package '{name}' {version}: {vuln_id} - {summary}",
+                line=line
             ))
             score += SCORE_VULNERABLE_DEPENDENCY_CONFIRMED
         return score

@@ -9,12 +9,12 @@ from typing import Optional, List
 from datetime import datetime
 from tqdm import tqdm
 
-from repo_scanner.models.scan_result import FileScanResult, ScanSummary, Finding, RiskLevel
+from repo_scanner.models.scan_result import FileScanResult, ScanSummary, RiskLevel
 from repo_scanner.scanner.file_analyzer import FileAnalyzer
 from repo_scanner.scanner.dependency_checker import DependencyChecker
 from repo_scanner.utils.git_utils import GitUtils
 from repo_scanner.utils.file_utils import FileUtils
-from repo_scanner.config import MAX_FILES_TO_SCAN, SKIP_DIRS, SKIP_FILENAMES, SKIP_FILENAME_PATTERNS
+from repo_scanner.config import CAUTION_SEVERITY, MAX_FILES_TO_SCAN, SKIP_DIRS, SKIP_FILENAMES, SKIP_FILENAME_PATTERNS
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +163,8 @@ class RepoScanner:
 
         severity_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
         all_findings.sort(key=lambda f: severity_order.get(f.severity, 4))
+        cautions = [f for f in all_findings if f.severity == CAUTION_SEVERITY]
+        all_findings = [f for f in all_findings if f.severity != CAUTION_SEVERITY]
 
         return ScanSummary(
             repo_name=self.repo_name,
@@ -176,6 +178,8 @@ class RepoScanner:
             safe_files=safe,
             overall_risk_score=overall_score,
             findings=all_findings[:50],
+            cautions=cautions[:50],
+            scan_root=str(self.repo_path) if self.repo_path else '',
             start_time=start_time,
             end_time=end_time,
             scan_duration=duration,

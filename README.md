@@ -38,18 +38,6 @@ Existing tools split the problem. gitleaks and trufflehog focus on secrets. semg
 ## Quick Start
 
 ```bash
-git clone https://github.com/MR-UNKNOWN8014/repo-security-scanner.git
-cd repo-security-scanner
-
-./setup.sh          # Linux/macOS
-setup.bat           # Windows
-
-python run_scanner.py https://github.com/user/repo.git
-```
-
-Or install straight from PyPI:
-
-```bash
 pip install repo-security-scanner
 repo-scanner https://github.com/user/repo.git
 ```
@@ -58,42 +46,28 @@ repo-scanner https://github.com/user/repo.git
 
 **Requires Python 3.8 or higher.**
 
-### Automated installer
-
-Linux and macOS:
+### From PyPI
 
 ```bash
-chmod +x setup.sh
-./setup.sh
+pip install repo-security-scanner
+repo-scanner https://github.com/user/repo.git
 ```
 
-Windows:
+### From source
 
 ```bash
-setup.bat
-```
+git clone https://github.com/MR-UNKNOWN8014/repo-security-scanner.git
+cd repo-security-scanner
 
-The installer verifies your Python version, installs dependencies, and creates the run script. If Python is not on your PATH, it will point you at 3.8+ from [python.org](https://python.org/).
-
-### Manual install
-
-```bash
 python -m venv venv
-
 source venv/bin/activate     # Linux/macOS
 venv\Scripts\activate        # Windows
 
-pip install -r requirements.txt
-```
-
-### As a package
-
-The project ships a `pyproject.toml`, so you can install it as a CLI instead of running scripts directly:
-
-```bash
 pip install -e .
 repo-scanner https://github.com/user/repo.git
 ```
+
+`pip install -e .` reads `pyproject.toml`, which declares `requires-python = ">=3.8"`, so pip refuses to install on an older interpreter. Running `python main.py <url>` also works from a source checkout without installing.
 
 ## Usage
 
@@ -101,22 +75,22 @@ repo-scanner https://github.com/user/repo.git
 
 ```bash
 # Remote repository
-python run_scanner.py https://github.com/user/repo.git
+repo-scanner https://github.com/user/repo.git
 
 # Local path
-python run_scanner.py /path/to/local/repo
+repo-scanner /path/to/local/repo
 
 # Quick scan (size limited, good for CI)
-python run_scanner.py https://github.com/user/repo.git --mode quick
+repo-scanner https://github.com/user/repo.git --mode quick
 
 # Thorough scan with detailed output
-python run_scanner.py https://github.com/user/repo.git --mode thorough --detailed
+repo-scanner https://github.com/user/repo.git --mode thorough --detailed
 
 # Export report to JSON
-python run_scanner.py https://github.com/user/repo.git --output report.json
+repo-scanner https://github.com/user/repo.git --output report.json
 
 # Query OSV.dev for live dependency vulnerabilities
-python run_scanner.py https://github.com/user/repo.git --check-vulns
+repo-scanner https://github.com/user/repo.git --check-vulns
 ```
 
 ### Arguments
@@ -124,7 +98,7 @@ python run_scanner.py https://github.com/user/repo.git --check-vulns
 | Option            | Short | Description                                                                           | Default  |
 | ----------------- | ----- | ------------------------------------------------------------------------------------- | -------- |
 | `--mode`          | `-m`  | Scan mode: quick, balanced, thorough, smart                                           | balanced |
-| `--output`        | `-o`  | Export report to JSON or CSV                                                          | None     |
+| `--output`        | `-o`  | Export report to JSON, CSV or SARIF (by file extension)                               | None     |
 | `--verbose`       | `-v`  | Show detailed scan progress                                                           | False    |
 | `--detailed`      | `-d`  | Show detailed breakdown in report                                                     | False    |
 | `--format`        |       | Report format: simple, multi, categories, detailed, all                               | all      |
@@ -157,60 +131,16 @@ Lines starting with `#` and blank lines are ignored. Patterns match both the pat
 
 ## Detection capabilities
 
-### Malicious pattern categories
+| Check                   | What it finds                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------ |
+| Malicious patterns      | Crypto miners, backdoors, data exfiltration, obfuscation, shell commands       |
+| Language-specific calls | Dangerous functions in Python, JavaScript, Bash, PHP, Ruby, Go, Rust, Java     |
+| Vulnerable dependencies | Pinned versions below a known-bad floor, plus live OSV.dev lookups             |
+| Secrets                 | AWS, GitHub, GitLab, Slack, Google, Stripe, Twilio, SendGrid keys, JWTs, more  |
+| Dockerfiles             | Root user, curl-pipe-bash, insecure TLS, baked secrets                         |
+| Cautions                | Long lines, unpinned base images, ADD vs COPY, network calls, listed separately and never scored |
 
-| Category          | Example patterns                                  |
-| ----------------- | ------------------------------------------------- |
-| Crypto miners     | cryptonight, stratum, xmrig, mining, cpuminer     |
-| Backdoors         | socket.bind, socket.connect, base64.b64decode     |
-| Data exfiltration | requests.post, discord webhook, smtplib, telegram |
-| Obfuscation       | base64, zlib, exec(decode), String.fromCharCode   |
-| Shell commands    | subprocess, os.system, popen, eval                |
-| Network activity  | socket, requests, urllib, websocket, ftp          |
-| File operations   | os.remove, shutil.rmtree, file.write, os.chmod    |
-
-### Language-specific detection
-
-| Language   | Detected functions                                                                        |
-| ---------- | ----------------------------------------------------------------------------------------- |
-| Python     | exec, eval, compile, `__import__`, os.system, subprocess.call, subprocess.Popen, os.popen |
-| JavaScript | eval, Function, setTimeout, setInterval, document.write, innerHTML                        |
-| Bash       | exec, eval, source, export, alias                                                         |
-| PHP        | eval, system, exec, passthru, shell_exec, assert                                          |
-| Ruby       | eval, exec, system, backticks, IO.popen, Open3                                            |
-| Go         | os/exec, syscall, reflect, unsafe                                                         |
-| Rust       | std::process, std::fs, unsafe, std::mem                                                   |
-| Java       | Runtime.exec, ProcessBuilder, System.load, Class.forName                                  |
-
-### Vulnerable dependencies
-
-Offline (default): checks pinned versions of a curated list against known-bad floors. A package is only flagged if the pinned version is actually below the fixed version. Unpinned or unparseable specs are skipped rather than guessed at.
-
-| Manager | Checked packages                                  |
-| ------- | ------------------------------------------------- |
-| npm     | crypto-js, node-fetch, axios, lodash, request     |
-| pip     | requests, urllib3, paramiko, cryptography, pyyaml |
-
-Online (`--check-vulns`): queries [OSV.dev](https://osv.dev/) for every pinned dependency in `requirements.txt` and `package.json`, not just the list above. Off by default because it sends dependency names and versions to a third party.
-
-### Secret detection
-
-Scans every text file for hardcoded credentials: AWS, GitHub, GitLab, Slack, Google, Stripe, Twilio, and SendGrid keys, private key blocks, JWTs, and generic `api_key` / `secret` / `token` / `password` assignments. Findings report a file and line number, but the value itself is redacted (first and last few characters only). Known placeholder values such as `EXAMPLE`, `changeme`, or `<your_key_here>` are filtered out so docs and templates do not trip it.
-
-A single confirmed secret pushes that file's risk score into the CRITICAL range on its own.
-
-### Dockerfile scanning
-
-Any `Dockerfile`, `Dockerfile.*`, or `*.dockerfile` is additionally checked for:
-
-| Check               | What it catches                                                               |
-| ------------------- | ----------------------------------------------------------------------------- |
-| Unpinned base image | `FROM image:latest` or no tag at all                                          |
-| Root user           | No `USER` instruction, or explicit `USER root`                                |
-| ADD vs COPY         | `ADD` used for a local file where `COPY` would work                           |
-| Pipe to shell       | `curl \| bash`, `wget \| sh`, and similar                                     |
-| Insecure TLS        | `curl -k`, `--no-check-certificate`                                           |
-| Hardcoded secret    | `ENV` or `ARG` setting a `PASSWORD`, `SECRET`, `TOKEN`, or `API_KEY` directly |
+Full pattern lists, package lists and per-check behavior: [docs/DETECTION_CAPABILITIES.md](docs/DETECTION_CAPABILITIES.md).
 
 ## Risk scoring
 
@@ -225,6 +155,8 @@ Scores run 0 to 100. Higher means more risk.
 | 75-100 | CRITICAL    | Do not clone          |
 
 The score is weighted by category. Malicious patterns and dangerous functions dominate. Entropy, base64, and file size are secondary signals. Vulnerable dependencies and Dockerfile findings add per-package or per-finding penalties. A confirmed secret can single-handedly push a file to CRITICAL.
+
+Best practice notes such as long lines are reported as **cautions**, in their own section, and never affect the score. Every finding and caution reports the file it came from, and a line number wherever one applies.
 
 Full breakdown: [docs/SCORING_AND_FORMATS.md](docs/SCORING_AND_FORMATS.md#risk-scoring).
 
@@ -249,7 +181,10 @@ JSON and CSV export are separate from the display format:
 ```bash
 repo-scanner https://github.com/user/repo.git --output report.json
 repo-scanner https://github.com/user/repo.git --output report.csv
+repo-scanner https://github.com/user/repo.git --output results.sarif
 ```
+
+SARIF 2.1.0 is rendered natively by GitHub Code Scanning, so scan results show up in the Security tab. See [docs/SCORING_AND_FORMATS.md](docs/SCORING_AND_FORMATS.md#sarif-export).
 
 ## Limitations
 
@@ -263,8 +198,6 @@ repo-scanner https://github.com/user/repo.git --output report.csv
 
 ```
 repo-security-scanner/
-├── setup.sh                     # Linux/macOS installer
-├── setup.bat                    # Windows installer
 ├── requirements.txt             # Python dependencies
 ├── pyproject.toml               # Packaging
 ├── README.md
@@ -285,13 +218,15 @@ repo-security-scanner/
 │       └── publish.yml          # Publish to PyPI on GitHub Release
 │
 ├── docs/
-│   └── SCORING_AND_FORMATS.md   # Risk scoring and report format docs
+│   ├── SCORING_AND_FORMATS.md    # Risk scoring and report formats
+│   └── DETECTION_CAPABILITIES.md # Full detection reference
 │
 ├── tests/
 │   ├── test_entropy_calculator.py
 │   ├── test_pattern_matcher.py
 │   ├── test_dependency_checker.py
 │   ├── test_file_utils.py
+│   ├── test_formatter.py
 │   ├── test_scoring.py
 │   ├── test_secret_detector.py
 │   └── test_dockerfile_scanner.py
@@ -326,7 +261,7 @@ repo-security-scanner/
 | Python not found     | Python installed?       | Install Python 3.8+ from [python.org](https://python.org/)            |
 | ModuleNotFoundError  | Dependencies installed? | Run `pip install -r requirements.txt`                                 |
 | Git clone failed     | Git installed?          | Install Git from [git-scm.com](https://git-scm.com/)                  |
-| Permission denied    | File permissions?       | `chmod +x setup.sh` (Linux/macOS)                                     |
+| Command not found    | Installed in this env?  | `pip install repo-security-scanner`, or run `python main.py` from a checkout |
 | Scan takes too long  | Large repository?       | Use `--mode quick` or `--mode smart`                                  |
 | Report not generated | Output path valid?      | Check write permissions for the output directory                      |
 | Entropy warnings     | False positives?        | Review the file. If it is legitimate, add it to `.reposecurityignore` |

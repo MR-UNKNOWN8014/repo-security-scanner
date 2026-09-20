@@ -11,8 +11,7 @@ class ReportFormatter:
         score = summary.overall_risk_score
         bar = ReportFormatter._get_progress_bar(score, 20)
         status = ReportFormatter._get_status(score)
-        color = ReportFormatter._get_color(score)
-        
+
         return f"""
 ============================================================
   REPOSITORY: {summary.repo_name}
@@ -68,6 +67,7 @@ class ReportFormatter:
   Risk Level:    {level_label}
   Score:         {score:>5.1f}%
   Findings:      {len(summary.findings)} issues found
+  Cautions:      {len(summary.cautions)} best practice notes
   Files:         {summary.high_risk_files} high, {summary.medium_risk_files} medium, {summary.low_risk_files} low
   Recommendation: {ReportFormatter._get_recommendation(score)}
 ============================================================
@@ -102,14 +102,22 @@ STATISTICS:
                     'low': Fore.GREEN
                 }.get(finding.severity, Fore.WHITE)
                 
-                location = f"{finding.file_path}:{finding.line} " if finding.line else ""
-                detailed += f"  {i}. {severity_color}[{finding.severity.upper()}]{Style.RESET_ALL} {location}"
-                detailed += f"{finding.category}: {finding.description[:60]}"
-                if len(finding.description) > 60:
-                    detailed += "..."
-                detailed += "\n"
-        
+                detailed += f"  {i}. {severity_color}[{finding.severity.upper()}]{Style.RESET_ALL} "
+                detailed += ReportFormatter._format_finding_line(finding)
+
+        if show_findings and summary.cautions:
+            detailed += "\nCAUTIONS (best practice, not scored):\n"
+            for i, caution in enumerate(summary.cautions[:10], 1):
+                detailed += f"  {i}. {Fore.CYAN}[CAUTION]{Style.RESET_ALL} "
+                detailed += ReportFormatter._format_finding_line(caution)
+
         return detailed
+
+    @staticmethod
+    def _format_finding_line(finding) -> str:
+        location = f"{finding.file_path}:{finding.line}" if finding.line is not None else finding.file_path
+        description = finding.description[:60] + ("..." if len(finding.description) > 60 else "")
+        return f"{location} {finding.category}: {description}\n"
     
     @staticmethod
     def _get_progress_bar(value: float, width: int = 20) -> str:

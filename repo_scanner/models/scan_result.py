@@ -55,6 +55,10 @@ class ScanSummary:
     safe_files: int
     overall_risk_score: float
     findings: List[Finding] = field(default_factory=list)
+    # best practice notes, never scored, kept out of the findings list
+    cautions: List[Finding] = field(default_factory=list)
+    # directory the scan ran against, used to relativize paths for SARIF
+    scan_root: str = ''
     start_time: datetime = field(default_factory=datetime.now)
     end_time: Optional[datetime] = None
     scan_duration: float = 0.0
@@ -83,5 +87,6 @@ class ScanSummary:
             'low_risk_files': self.low_risk_files,
             'safe_files': self.safe_files,
             'findings_count': len(self.findings),
+            'cautions_count': len(self.cautions),
             'scan_duration': self.scan_duration
         }

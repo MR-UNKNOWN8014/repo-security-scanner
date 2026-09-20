@@ -23,7 +23,7 @@ Examples:
         help='Scan mode (default: balanced)'
     )
     
-    parser.add_argument('--output', '-o', help='Output report file (.json or .csv)')
+    parser.add_argument('--output', '-o', help='Output report file (.json, .csv or .sarif)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
     parser.add_argument('--detailed', '-d', action='store_true', help='Show detailed breakdown')
     

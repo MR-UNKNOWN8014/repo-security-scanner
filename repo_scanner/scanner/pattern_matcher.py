@@ -1,10 +1,10 @@
 """Pattern matching engine"""
 
 import re
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from repo_scanner.config import (
     MALICIOUS_PATTERNS, DANGEROUS_FUNCTIONS,
-    SCORE_PATTERN_MATCH, SCORE_LONG_LINE, SCORE_EXTREMELY_LONG_LINE,
+    SCORE_PATTERN_MATCH,
     SCORE_DANGEROUS_FUNCTION, SCORE_BASE64_FEW, SCORE_BASE64_MANY,
     SCORE_BASE64_DECODE, SCORE_BASE64_ENCODE,
     LONG_LINE_CHARS, EXTREMELY_LONG_LINE_CHARS,
@@ -13,6 +13,10 @@ from repo_scanner.config import (
 from repo_scanner.scanner.entropy_calculator import EntropyCalculator
 
 _BASE64_RE = re.compile(rf'[A-Za-z0-9+/]{{{BASE64_MIN_LENGTH},}}={{0,2}}')
+
+
+def _line_of(content: str, index: int) -> int:
+    return content.count('\n', 0, index) + 1
 
 _NETWORK_PATTERNS = [
     (re.compile(r'requests\.(get|post|put|delete|patch)', re.IGNORECASE), 'HTTP request'),
@@ -39,27 +43,29 @@ class PatternMatcher:
         }
         self.dangerous_funcs = DANGEROUS_FUNCTIONS
 
-    def detect_malicious_patterns(self, content: str) -> Tuple[float, List[Tuple[str, str]]]:
+    def detect_malicious_patterns(self, content: str) -> Tuple[float, List[Tuple[str, str, Optional[int]]]]:
         risk_score = 0.0
         findings = []
 
+        # search over whole content, not per line, so one pattern scores once per file
         for category, patterns in self.compiled_patterns.items():
             for pattern in patterns:
-                if pattern.search(content):
-                    findings.append((category, pattern.pattern))
+                match = pattern.search(content)
+                if match:
+                    findings.append((category, pattern.pattern, _line_of(content, match.start())))
                     risk_score += SCORE_PATTERN_MATCH
 
-        for line in content.split('\n'):
+        # long lines are reported for every file type but never scored: prose,
+        # minified assets and data files are long for legitimate reasons
+        for line_number, line in enumerate(content.split('\n'), start=1):
             if len(line) > EXTREMELY_LONG_LINE_CHARS:
-                findings.append(('obfuscation', f'extremely long line: {len(line)} chars'))
-                risk_score += SCORE_EXTREMELY_LONG_LINE
+                findings.append(('long_line', f'extremely long line: {len(line)} chars', line_number))
             elif len(line) > LONG_LINE_CHARS:
-                findings.append(('obfuscation', f'long line: {len(line)} chars'))
-                risk_score += SCORE_LONG_LINE
+                findings.append(('long_line', f'long line: {len(line)} chars', line_number))
 
         return min(risk_score, 100), findings
 
-    def detect_dangerous_functions(self, content: str, file_type: str) -> Tuple[float, List[str]]:
+    def detect_dangerous_functions(self, content: str, file_type: str) -> Tuple[float, List[Tuple[str, int]]]:
         score = 0.0
         found = []
 
@@ -67,13 +73,14 @@ class PatternMatcher:
 
         if language in self.dangerous_funcs:
             for func in self.dangerous_funcs[language]:
-                if func in content:
-                    found.append(func)
+                index = content.find(func)
+                if index != -1:
+                    found.append((func, _line_of(content, index)))
                     score += SCORE_DANGEROUS_FUNCTION
 
         return min(score, 100), found
 
-    def detect_base64_encoding(self, content: str) -> Tuple[float, List[str]]:
+    def detect_base64_encoding(self, content: str) -> Tuple[float, List[Tuple[str, Optional[int]]]]:
         findings = []
         score = 0.0
 
@@ -86,24 +93,35 @@ class PatternMatcher:
             and EntropyCalculator.calculate_entropy(m.encode('utf-8', errors='ignore')) >= BASE64_MIN_ENTROPY
         ]
 
-        if len(candidates) > BASE64_MANY_COUNT:
-            findings.append(f'Multiple base64 strings: {len(candidates)}')
-            score += SCORE_BASE64_MANY
-        elif len(candidates) > BASE64_FEW_COUNT:
-            findings.append(f'Base64 strings: {len(candidates)}')
-            score += SCORE_BASE64_FEW
+        if candidates:
+            # the count is a whole-file signal, so anchor it at the first candidate
+            first_line = _line_of(content, content.find(candidates[0]))
+            if len(candidates) > BASE64_MANY_COUNT:
+                findings.append((f'Multiple base64 strings: {len(candidates)}', first_line))
+                score += SCORE_BASE64_MANY
+            elif len(candidates) > BASE64_FEW_COUNT:
+                findings.append((f'Base64 strings: {len(candidates)}', first_line))
+                score += SCORE_BASE64_FEW
 
-        if 'base64.b64decode' in content.lower():
-            findings.append('base64 decode function found')
+        lowered = content.lower()
+        decode_index = lowered.find('base64.b64decode')
+        if decode_index != -1:
+            findings.append(('base64 decode function found', _line_of(content, decode_index)))
             score += SCORE_BASE64_DECODE
-        if 'base64.b64encode' in content.lower():
-            findings.append('base64 encode function found')
+        encode_index = lowered.find('base64.b64encode')
+        if encode_index != -1:
+            findings.append(('base64 encode function found', _line_of(content, encode_index)))
             score += SCORE_BASE64_ENCODE
 
         return min(score, 100), findings
 
-    def detect_network_connections(self, content: str) -> List[str]:
-        return [description for pattern, description in _NETWORK_PATTERNS if pattern.search(content)]
+    def detect_network_connections(self, content: str) -> List[Tuple[str, int]]:
+        found = []
+        for pattern, description in _NETWORK_PATTERNS:
+            match = pattern.search(content)
+            if match:
+                found.append((description, _line_of(content, match.start())))
+        return found
 
     def _detect_language(self, file_extension: str) -> str:
         return _LANG_MAP.get(file_extension.lower(), 'unknown')
