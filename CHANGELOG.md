@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version is below 1.0.0, a minor bump may contain breaking changes.
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-09-20
 
 ### Added
 
@@ -88,6 +88,6 @@ First PyPI release, published with Trusted Publishing.
 - Trimmed unused dependencies. Only `colorama` and `tqdm` remain.
 - Replaced diagnostic `print` calls with `logging`, precompiled regex patterns, and moved file scanning onto a thread pool.
 
-[0.2.0]: https://github.com/MR-UNKNOWN8014/repo-security-scanner/compare/v0.1.1...HEAD
+[0.2.0]: https://github.com/MR-UNKNOWN8014/repo-security-scanner/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/MR-UNKNOWN8014/repo-security-scanner/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/MR-UNKNOWN8014/repo-security-scanner/releases/tag/v0.1.0
