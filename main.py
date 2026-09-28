@@ -2,6 +2,8 @@
 
 import logging
 import sys
+from pathlib import Path
+from typing import List
 from colorama import init
 
 from repo_scanner.cli.arguments import parse_arguments
@@ -9,8 +11,8 @@ from repo_scanner.scanner.core import RepoScanner
 from repo_scanner.report.formatter import ReportFormatter
 from repo_scanner.report.exporters import ReportExporter
 from repo_scanner.utils.file_utils import FileUtils
-from repo_scanner.models.scan_result import ScanSummary
-from repo_scanner.config import __version__
+from repo_scanner.models.scan_result import RiskLevel, ScanSummary, risk_level_for
+from repo_scanner.config import EXIT_ERROR, EXIT_OK, EXIT_THRESHOLD, RISK_THRESHOLDS, __version__
 
 init(autoreset=True)
 
@@ -61,22 +63,8 @@ def main():
         elif args.format == 'detailed':
             print(formatter.format_detailed(summary, show_findings=True))
         
-        if args.output:
-            exporter = ReportExporter()
-            try:
-                if args.output.endswith('.sarif'):
-                    exporter.export_sarif(summary, args.output)
-                    print(f"\nReport saved to: {args.output}")
-                elif args.output.endswith('.json'):
-                    exporter.export_json(summary, args.output)
-                    print(f"\nReport saved to: {args.output}")
-                elif args.output.endswith('.csv'):
-                    exporter.export_csv(summary, args.output)
-                    print(f"\nReport saved to: {args.output}")
-                else:
-                    print(f"\nUnsupported output format, use .json, .csv or .sarif: {args.output}")
-            except OSError as e:
-                print(f"\nFailed to save report to {args.output}: {e}")
+        for message in export_reports(summary, args.output):
+            print(f"\n{message}")
         
         if not args.auto_decision:
             decision = handle_decision(summary, is_local)
@@ -89,20 +77,51 @@ def main():
                 if not is_local:
                     scanner.cleanup()
         
-        if summary.overall_risk_score >= 50:
-            return 1
-        
-        return 0
-        
+        if exceeds_threshold(summary.overall_risk_score, args.fail_on):
+            print(f"\nRisk score {summary.overall_risk_score:.1f} reached the --fail-on {args.fail_on} threshold.")
+            return EXIT_THRESHOLD
+
+        return EXIT_OK
+
     except KeyboardInterrupt:
         print(f"\nScan interrupted by user")
-        return 1
+        return EXIT_ERROR
     except Exception as e:
         print(f"\nError: {e}")
         if args.verbose:
             import traceback
             traceback.print_exc()
-        return 1
+        return EXIT_ERROR
+
+
+EXPORTERS_BY_SUFFIX = {
+    '.json': ReportExporter.export_json,
+    '.csv': ReportExporter.export_csv,
+    '.sarif': ReportExporter.export_sarif,
+}
+
+
+def export_reports(summary: ScanSummary, paths) -> List[str]:
+    """Write every requested report in one pass, so one scan can emit several formats."""
+    messages = []
+    for path in paths or []:
+        suffix = Path(path).suffix.lower()
+        exporter = EXPORTERS_BY_SUFFIX.get(suffix)
+        if exporter is None:
+            messages.append(f"Unsupported output format, use {', '.join(sorted(EXPORTERS_BY_SUFFIX))}: {path}")
+            continue
+        try:
+            exporter(summary, path)
+            messages.append(f"Report saved to: {path}")
+        except OSError as e:
+            messages.append(f"Failed to save report to {path}: {e}")
+    return messages
+
+
+def exceeds_threshold(score: float, fail_on: str) -> bool:
+    if fail_on == 'none':
+        return False
+    return score >= RISK_THRESHOLDS[fail_on]
 
 def handle_decision(summary: ScanSummary, is_local: bool) -> bool:
     score = summary.overall_risk_score
@@ -111,13 +130,15 @@ def handle_decision(summary: ScanSummary, is_local: bool) -> bool:
     print(f"\nDecision Time")
     print("-" * 40)
 
-    if score < 25:
-        print(f"Repository appears SAFE")
+    level = risk_level_for(score)
+
+    if level in (RiskLevel.SAFE, RiskLevel.LOW):
+        print(f"Repository appears {'SAFE' if level is RiskLevel.SAFE else 'LOW risk'}")
         print(f"Risk Score: {score:.1f}/100")
         response = input(f"Would you like to {action} this repository? (yes/no): ").lower()
         return response.startswith('y')
 
-    elif score < 50:
+    elif level is RiskLevel.MEDIUM:
         print(f"Repository has MEDIUM risk")
         print(f"Risk Score: {score:.1f}/100")
         print("\nWould you like to:")

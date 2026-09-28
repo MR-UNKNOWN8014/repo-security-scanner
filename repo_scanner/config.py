@@ -76,6 +76,12 @@ RISK_THRESHOLDS = {
     'low': 10
 }
 
+# exit codes: a threshold breach must be distinguishable from a tool failure,
+# otherwise CI cannot tell "repo is risky" from "scanner crashed"
+EXIT_OK = 0
+EXIT_THRESHOLD = 1
+EXIT_ERROR = 2
+
 # risk score point values, centralized so scoring logic isn't scattered magic numbers
 SCORE_PATTERN_MATCH = 5
 SCORE_DANGEROUS_FUNCTION = 3

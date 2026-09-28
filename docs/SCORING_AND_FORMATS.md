@@ -132,6 +132,7 @@ Risk level, score, and a per-severity file breakdown.
   Risk Level:     [LOW]
   Score:          23.5%
   Findings:       12 issues found
+  Cautions:       3 best practice notes
   Files:          0 high, 3 medium, 9 low
   Recommendation: REVIEW BEFORE CLONING
 ============================================================
@@ -152,6 +153,7 @@ Everything from `categories` plus file statistics and the top findings.
   Risk Level:     [LOW]
   Score:          23.5%
   Findings:       12 issues found
+  Cautions:       3 best practice notes
   Files:          0 high, 3 medium, 9 low
   Recommendation: REVIEW BEFORE CLONING
 ============================================================
@@ -166,8 +168,9 @@ STATISTICS:
   Total Files:     57
   Scan Duration:   4.32s
   Findings Found:  12
+  Cautions Found:  3
 
-TOP FINDINGS:
+TOP FINDINGS (showing 5 of 12):
   1. [MEDIUM] encoding: Multiple base64 strings: 8
   2. [MEDIUM] vulnerable_dependency: NPM package 'lodash': Prototype pollution
   3. [LOW] dangerous_function: Dangerous function: eval
@@ -198,6 +201,12 @@ repo-scanner https://github.com/user/repo.git --output results.sarif
 ```
 
 Writes SARIF 2.1.0, which GitHub Code Scanning renders natively in the Security tab. Each finding category becomes a rule, each finding a result, with the line number as a `region.startLine`. Severity maps as `critical`/`high` to `error`, `medium` to `warning`, `low`/`info` to `note`. Cautions are included as notes. Paths are normalized to forward slashes so GitHub can match them to repo files.
+
+Several formats can come from a single scan, which is how the GitHub Action gets JSON for its outputs and SARIF for Code Scanning without scanning twice:
+
+```bash
+repo-scanner https://github.com/user/repo.git -o report.json -o results.sarif
+```
 
 Upload it from a workflow:
 

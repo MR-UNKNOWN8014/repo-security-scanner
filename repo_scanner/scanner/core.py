@@ -179,6 +179,8 @@ class RepoScanner:
             overall_risk_score=overall_score,
             findings=all_findings[:50],
             cautions=cautions[:50],
+            total_findings=len(all_findings),
+            total_cautions=len(cautions),
             scan_root=str(self.repo_path) if self.repo_path else '',
             start_time=start_time,
             end_time=end_time,

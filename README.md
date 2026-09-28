@@ -89,6 +89,9 @@ repo-scanner https://github.com/user/repo.git --mode thorough --detailed
 # Export report to JSON
 repo-scanner https://github.com/user/repo.git --output report.json
 
+# Several formats from one scan
+repo-scanner https://github.com/user/repo.git -o report.json -o results.sarif
+
 # Query OSV.dev for live dependency vulnerabilities
 repo-scanner https://github.com/user/repo.git --check-vulns
 ```
@@ -98,13 +101,32 @@ repo-scanner https://github.com/user/repo.git --check-vulns
 | Option            | Short | Description                                                                           | Default  |
 | ----------------- | ----- | ------------------------------------------------------------------------------------- | -------- |
 | `--mode`          | `-m`  | Scan mode: quick, balanced, thorough, smart                                           | balanced |
-| `--output`        | `-o`  | Export report to JSON, CSV or SARIF (by file extension)                               | None     |
+| `--output`        | `-o`  | Export report to JSON, CSV or SARIF by file extension. Repeatable.                     | None     |
 | `--verbose`       | `-v`  | Show detailed scan progress                                                           | False    |
 | `--detailed`      | `-d`  | Show detailed breakdown in report                                                     | False    |
-| `--format`        |       | Report format: simple, multi, categories, detailed, all                               | all      |
-| `--keep-repo`     |       | Keep cloned repo after scanning. Only effective with `--auto-decision`; interactively, your answer decides. | False    |
-| `--auto-decision` |       | Automatically decide based on risk score                                              | False    |
-| `--check-vulns`   |       | Query OSV.dev for every pinned dependency. Sends names and versions to a third party. | False    |
+| `--format`        | `-f`  | Report format: simple, multi, categories, detailed, all                               | all      |
+| `--fail-on`       | `-F`  | Exit 1 when the risk score reaches this level: none, low, medium, high, critical      | high     |
+| `--keep-repo`     | `-k`  | Keep cloned repo after scanning. Only effective with `--auto-decision`; interactively, your answer decides. | False    |
+| `--auto-decision` | `-A`  | Automatically decide based on risk score                                              | False    |
+| `--check-vulns`   | `-c`  | Query OSV.dev for every pinned dependency. Sends names and versions to a third party. | False    |
+
+### Exit codes
+
+| Code | Meaning                                              |
+| ---- | ---------------------------------------------------- |
+| 0    | Scan completed below the `--fail-on` threshold       |
+| 1    | Risk score reached the `--fail-on` threshold         |
+| 2    | The scan itself failed, for example a clone error    |
+
+A threshold breach and a tool failure are deliberately different codes, so CI can tell a risky repository from a broken scanner and never fail open.
+
+```bash
+# fail the build only on a critical score
+repo-scanner https://github.com/user/repo.git -A -F critical
+
+# report everything, never fail the build
+repo-scanner https://github.com/user/repo.git -A -F none
+```
 
 ### Scan modes
 
@@ -128,6 +150,22 @@ tests/fixtures/*
 ```
 
 Lines starting with `#` and blank lines are ignored. Patterns match both the path relative to the repo root and the filename.
+
+## GitHub Action
+
+Scan in CI, either your own checkout or a third party repository you are about to trust:
+
+```yaml
+- uses: actions/checkout@v4
+- uses: MR-UNKNOWN8014/repo-security-scanner@v1
+  with:
+    mode: quick
+    fail-on: high
+```
+
+The job fails when the score reaches `fail-on`, and fails separately when the scan itself could not complete, so a broken scan never reads as a pass. Outputs include `risk-score`, `risk-level`, `findings-count` and `threshold-exceeded`, and SARIF can be uploaded to GitHub Code Scanning.
+
+Inputs, outputs, exit behavior and Code Scanning setup: [docs/GITHUB_ACTION.md](docs/GITHUB_ACTION.md).
 
 ## Detection capabilities
 
@@ -217,9 +255,12 @@ repo-security-scanner/
 │       ├── tests.yml            # CI: test suite on push/PR
 │       └── publish.yml          # Publish to PyPI on GitHub Release
 │
+├── action.yml                    # GitHub Action definition
+│
 ├── docs/
 │   ├── SCORING_AND_FORMATS.md    # Risk scoring and report formats
-│   └── DETECTION_CAPABILITIES.md # Full detection reference
+│   ├── DETECTION_CAPABILITIES.md # Full detection reference
+│   └── GITHUB_ACTION.md          # GitHub Action reference
 │
 ├── tests/
 │   ├── test_entropy_calculator.py
