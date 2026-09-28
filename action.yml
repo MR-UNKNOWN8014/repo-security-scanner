@@ -1,0 +1,163 @@
+name: 'Repo Security Scanner'
+description: 'Scan a repository for malware, backdoors, secrets and vulnerable dependencies before you clone or trust it'
+author: 'MR-UNKNOWN8014'
+
+branding:
+  icon: 'shield'
+  color: 'red'
+
+inputs:
+  repository:
+    description: 'Repository URL or local path to scan. Defaults to the checked out workspace.'
+    required: false
+    default: '.'
+  mode:
+    description: 'Scan mode: quick, balanced, thorough, smart'
+    required: false
+    default: 'quick'
+  fail-on:
+    description: 'Fail the job when the risk score reaches this level: none, low, medium, high, critical'
+    required: false
+    default: 'high'
+  check-vulns:
+    description: 'Query OSV.dev for live vulnerability data. Sends dependency names and versions to a third party.'
+    required: false
+    default: 'false'
+  output-json:
+    description: 'Path for the JSON report. Always written, and used to read the outputs below.'
+    required: false
+    default: 'repo-scanner-report.json'
+  output-sarif:
+    description: 'Optional path for a SARIF report, for upload to GitHub Code Scanning. Empty disables it.'
+    required: false
+    default: ''
+  version:
+    description: 'Version specifier for the scanner, for example 0.3.0. Empty installs the latest release.'
+    required: false
+    default: ''
+  python-version:
+    description: 'Python version used to run the scanner'
+    required: false
+    default: '3.12'
+
+outputs:
+  risk-score:
+    description: 'Numeric risk score, 0 to 100'
+    value: ${{ steps.scan.outputs.risk-score }}
+  risk-level:
+    description: 'Risk level: safe, low, medium, high, critical'
+    value: ${{ steps.scan.outputs.risk-level }}
+  findings-count:
+    description: 'Total number of findings, before the report truncates'
+    value: ${{ steps.scan.outputs.findings-count }}
+  cautions-count:
+    description: 'Total number of best practice cautions, which never affect the score'
+    value: ${{ steps.scan.outputs.cautions-count }}
+  threshold-exceeded:
+    description: 'true when the score reached the fail-on level'
+    value: ${{ steps.scan.outputs.threshold-exceeded }}
+  report-json:
+    description: 'Path to the JSON report'
+    value: ${{ steps.scan.outputs.report-json }}
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install repo-security-scanner
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        if [ -n "$INPUT_VERSION" ]; then
+          python -m pip install --quiet "repo-security-scanner==$INPUT_VERSION"
+        else
+          python -m pip install --quiet repo-security-scanner
+        fi
+        repo-scanner --help > /dev/null
+
+    - name: Scan
+      id: scan
+      shell: bash
+      env:
+        INPUT_REPOSITORY: ${{ inputs.repository }}
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_CHECK_VULNS: ${{ inputs.check-vulns }}
+        INPUT_OUTPUT_JSON: ${{ inputs.output-json }}
+        INPUT_OUTPUT_SARIF: ${{ inputs.output-sarif }}
+      run: |
+        set -uo pipefail
+
+        ARGS=("$INPUT_REPOSITORY" --mode "$INPUT_MODE" --fail-on "$INPUT_FAIL_ON" --auto-decision)
+        if [ "$INPUT_CHECK_VULNS" = "true" ]; then
+          ARGS+=(--check-vulns)
+        fi
+        ARGS+=(--output "$INPUT_OUTPUT_JSON")
+        if [ -n "$INPUT_OUTPUT_SARIF" ]; then
+          ARGS+=(--output "$INPUT_OUTPUT_SARIF")
+        fi
+
+        set +e
+        repo-scanner "${ARGS[@]}"
+        SCAN_EXIT=$?
+        set -e
+
+        # exit 2 means the scan itself failed, which must never look like a pass
+        if [ "$SCAN_EXIT" -ge 2 ]; then
+          echo "::error::repo-scanner failed to complete (exit $SCAN_EXIT)"
+          exit "$SCAN_EXIT"
+        fi
+
+        if [ ! -f "$INPUT_OUTPUT_JSON" ]; then
+          echo "::error::repo-scanner produced no report at $INPUT_OUTPUT_JSON"
+          exit 2
+        fi
+
+        # read the report instead of parsing stdout, so formatter changes cannot
+        # silently break these outputs
+        python - <<'PY' >> "$GITHUB_OUTPUT"
+        import json, os
+        report = os.environ['INPUT_OUTPUT_JSON']
+        with open(report, encoding='utf-8') as handle:
+            data = json.load(handle)
+        print(f"risk-score={data.get('overall_risk_score', 0)}")
+        print(f"risk-level={data.get('risk_level', 'unknown')}")
+        print(f"findings-count={data.get('findings_count', 0)}")
+        print(f"cautions-count={data.get('cautions_count', 0)}")
+        print(f"report-json={report}")
+        PY
+
+        if [ "$SCAN_EXIT" -eq 1 ]; then
+          echo "threshold-exceeded=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "threshold-exceeded=false" >> "$GITHUB_OUTPUT"
+        fi
+
+        python - <<'PY'
+        import json, os
+        with open(os.environ['INPUT_OUTPUT_JSON'], encoding='utf-8') as handle:
+            data = json.load(handle)
+        summary = os.environ.get('GITHUB_STEP_SUMMARY')
+        lines = [
+            '## Repo Security Scanner',
+            '',
+            f"Risk score: **{data.get('overall_risk_score', 0)}** ({data.get('risk_level', 'unknown')})",
+            f"Findings: {data.get('findings_count', 0)}",
+            f"Cautions: {data.get('cautions_count', 0)} (best practice, not scored)",
+        ]
+        for finding in data.get('findings', [])[:10]:
+            location = finding.get('file', '')
+            if finding.get('line') is not None:
+                location = f"{location}:{finding['line']}"
+            lines.append(f"- `{finding.get('severity')}` {location} {finding.get('category')}: {finding.get('description')}")
+        if summary:
+            with open(summary, 'a', encoding='utf-8') as handle:
+                handle.write('\n'.join(lines) + '\n')
+        PY
+
+        exit "$SCAN_EXIT"

@@ -4,6 +4,30 @@ All notable changes to this project are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version is below 1.0.0, a minor bump may contain breaking changes.
 
+## [0.3.0] - 2026-09-29
+
+### Added
+
+- A GitHub Action (`action.yml`) for running the scanner in CI. Composite action, installs from PyPI, exposes `risk-score`, `risk-level`, `findings-count`, `cautions-count`, `threshold-exceeded` and `report-json` as outputs, writes a job summary, and can emit SARIF for upload to Code Scanning. Outputs are read from the JSON report rather than scraped from terminal output, so formatter changes cannot break them, and inputs are passed through `env:` rather than interpolated into the shell. Documented in `docs/GITHUB_ACTION.md`.
+- `--output` is repeatable, so one scan can write several formats. `-o report.json -o results.sarif` writes both from a single pass, which is how the Action gets JSON for its outputs and SARIF for Code Scanning without cloning the repository twice.
+- `--fail-on {none,low,medium,high,critical}` (`-F`) to choose the risk level that fails a build. Defaults to `high`, which is exactly the previously hardcoded behavior.
+- Distinct exit codes. `0` below the threshold, `1` threshold reached, `2` the scan itself failed. Previously a risky repository and a crashed scanner both exited `1`, so CI could not tell them apart.
+- Short flags for the remaining options: `-f` for `--format`, `-F` for `--fail-on`, `-k` for `--keep-repo`, `-A` for `--auto-decision`, `-c` for `--check-vulns`.
+- An exit code table in the README, and an exit code summary in `--help`.
+
+### Changed
+
+- Score bands now have a single definition. `risk_level_for()` in `models/scan_result.py` reads `RISK_THRESHOLDS` from `config.py`, replacing the ladder that was hardcoded separately in `FileScanResult.get_risk_level` and `ScanSummary.get_risk_level`.
+- The progress bar is ASCII, `#` and `-`, matching what the docs already showed.
+- Status, colour and recommendation are now derived from the shared bands through lookup tables, so they cannot disagree with each other.
+
+### Fixed
+
+- **Every scan crashed on a default Windows console.** The progress bar used block characters, which a cp1252 terminal cannot encode, so the report raised `UnicodeEncodeError` after a successful scan and the process exited 2. A clean repository reported itself as a tool failure.
+- **Reported counts understated the scan.** Findings are truncated to 50 for the report, but the count printed that truncated number, so a scan with 150 findings said "Findings: 50 issues found" and the JSON `findings_count` was 50. Counts now report the true total, and the detailed report discloses truncation as "showing 10 of 150". JSON gains `findings_reported` and `cautions_reported` alongside the totals.
+- **The recommendation was one band off.** A LOW RISK repository was labelled "SAFE TO CLONE" and a MEDIUM RISK one only "REVIEW BEFORE CLONING", contradicting the documented table and understating risk. MEDIUM now reads "EXERCISE CAUTION".
+- The interactive prompt called a LOW RISK repository "appears SAFE" for the same reason.
+
 ## [0.2.0] - 2026-09-20
 
 ### Added
@@ -88,6 +112,7 @@ First PyPI release, published with Trusted Publishing.
 - Trimmed unused dependencies. Only `colorama` and `tqdm` remain.
 - Replaced diagnostic `print` calls with `logging`, precompiled regex patterns, and moved file scanning onto a thread pool.
 
+[0.3.0]: https://github.com/MR-UNKNOWN8014/repo-security-scanner/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/MR-UNKNOWN8014/repo-security-scanner/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/MR-UNKNOWN8014/repo-security-scanner/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/MR-UNKNOWN8014/repo-security-scanner/releases/tag/v0.1.0

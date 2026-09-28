@@ -1,9 +1,35 @@
 """Output formatting for scan reports"""
 
 from colorama import Fore, Style, init
-from repo_scanner.models.scan_result import ScanSummary, RiskLevel
+from repo_scanner.models.scan_result import ScanSummary, RiskLevel, risk_level_for
 
 init(autoreset=True)
+
+# one table per concern, all keyed off the shared score bands so the status,
+# the colour and the recommendation can never disagree with each other
+STATUS_BY_LEVEL = {
+    RiskLevel.SAFE: "SAFE",
+    RiskLevel.LOW: "LOW RISK",
+    RiskLevel.MEDIUM: "MEDIUM RISK",
+    RiskLevel.HIGH: "HIGH RISK",
+    RiskLevel.CRITICAL: "CRITICAL",
+}
+
+RECOMMENDATION_BY_LEVEL = {
+    RiskLevel.SAFE: "SAFE TO CLONE",
+    RiskLevel.LOW: "REVIEW BEFORE CLONING",
+    RiskLevel.MEDIUM: "EXERCISE CAUTION",
+    RiskLevel.HIGH: "AVOID CLONING",
+    RiskLevel.CRITICAL: "DO NOT CLONE",
+}
+
+COLOR_BY_LEVEL = {
+    RiskLevel.SAFE: Fore.GREEN,
+    RiskLevel.LOW: Fore.GREEN,
+    RiskLevel.MEDIUM: Fore.YELLOW,
+    RiskLevel.HIGH: Fore.RED,
+    RiskLevel.CRITICAL: Fore.RED + Style.BRIGHT,
+}
 
 class ReportFormatter:
     @staticmethod
@@ -66,8 +92,8 @@ class ReportFormatter:
   
   Risk Level:    {level_label}
   Score:         {score:>5.1f}%
-  Findings:      {len(summary.findings)} issues found
-  Cautions:      {len(summary.cautions)} best practice notes
+  Findings:      {summary.total_findings or len(summary.findings)} issues found
+  Cautions:      {summary.total_cautions or len(summary.cautions)} best practice notes
   Files:         {summary.high_risk_files} high, {summary.medium_risk_files} medium, {summary.low_risk_files} low
   Recommendation: {ReportFormatter._get_recommendation(score)}
 ============================================================
@@ -89,11 +115,14 @@ FILE BREAKDOWN:
 STATISTICS:
   Total Files:     {summary.total_files}
   Scan Duration:   {summary.scan_duration:.2f}s
-  Findings Found:  {len(summary.findings)}
+  Findings Found:  {summary.total_findings or len(summary.findings)}
+  Cautions Found:  {summary.total_cautions or len(summary.cautions)}
 """
         
         if show_findings and summary.findings:
-            detailed += "\nTOP FINDINGS:\n"
+            total = summary.total_findings or len(summary.findings)
+            shown = min(10, len(summary.findings))
+            detailed += f"\nTOP FINDINGS{f' (showing {shown} of {total})' if total > shown else ''}:\n"
             for i, finding in enumerate(summary.findings[:10], 1):
                 severity_color = {
                     'critical': Fore.RED + Style.BRIGHT,
@@ -106,7 +135,9 @@ STATISTICS:
                 detailed += ReportFormatter._format_finding_line(finding)
 
         if show_findings and summary.cautions:
-            detailed += "\nCAUTIONS (best practice, not scored):\n"
+            total_c = summary.total_cautions or len(summary.cautions)
+            shown_c = min(10, len(summary.cautions))
+            detailed += f"\nCAUTIONS, best practice, not scored{f' (showing {shown_c} of {total_c})' if total_c > shown_c else ''}:\n"
             for i, caution in enumerate(summary.cautions[:10], 1):
                 detailed += f"  {i}. {Fore.CYAN}[CAUTION]{Style.RESET_ALL} "
                 detailed += ReportFormatter._format_finding_line(caution)
@@ -121,41 +152,19 @@ STATISTICS:
     
     @staticmethod
     def _get_progress_bar(value: float, width: int = 20) -> str:
-        filled = int((value / 100) * width)
-        bar = '█' * filled + '░' * (width - filled)
-        return bar
+        # ASCII only: block characters crash a cp1252 Windows console, which
+        # made every scan exit as a tool error on a default terminal
+        filled = int((max(0.0, min(value, 100.0)) / 100) * width)
+        return '#' * filled + '-' * (width - filled)
     
     @staticmethod
     def _get_status(score: float) -> str:
-        if score < 10:
-            return "SAFE"
-        elif score < 25:
-            return "LOW RISK"
-        elif score < 50:
-            return "MEDIUM RISK"
-        elif score < 75:
-            return "HIGH RISK"
-        else:
-            return "CRITICAL"
-    
+        return STATUS_BY_LEVEL[risk_level_for(score)]
+
     @staticmethod
     def _get_color(score: float) -> str:
-        if score < 25:
-            return Fore.GREEN
-        elif score < 50:
-            return Fore.YELLOW
-        elif score < 75:
-            return Fore.RED
-        else:
-            return Fore.RED + Style.BRIGHT
-    
+        return COLOR_BY_LEVEL[risk_level_for(score)]
+
     @staticmethod
     def _get_recommendation(score: float) -> str:
-        if score < 25:
-            return "SAFE TO CLONE"
-        elif score < 50:
-            return "REVIEW BEFORE CLONING"
-        elif score < 75:
-            return "AVOID CLONING"
-        else:
-            return "DO NOT CLONE"
+        return RECOMMENDATION_BY_LEVEL[risk_level_for(score)]
