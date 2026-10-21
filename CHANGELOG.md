@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version is below 1.0.0, a minor bump may contain breaking changes.
 
+## [0.3.1] - 2026-10-22
+
+### Security
+
+- Bounded the gaps in regexes that run on scanned content. Patterns such as `requests\.get.*post` and the Dockerfile secret, pipe to shell and insecure TLS checks were quadratic on one very long line, so a hostile file could hang the scanner for minutes. Gaps are now capped and the leading `\w*` in the Dockerfile secret pattern is gone.
+- Secret masking now shows only the first four characters. It used to also show the last four, which exposed most of a short password.
+- Symlinked files, `package.json` and `requirements.txt` are skipped, so a link inside a scanned repository can no longer make the scanner read a file outside it.
+- Clones run with hooks, fsmonitor and the ext transport disabled and without submodules. Git never waits for a credential prompt, and the temporary directory is removed when the clone times out or fails.
+
+### Fixed
+
+- A repository that lived under a directory named like a skipped one, for example `build` or `venv`, scanned zero files and scored SAFE. Skipped directory names now apply only inside the scan root.
+- A run without a terminal and without `--auto-decision` crashed on the prompt with exit code 2 and left the clone behind. It now behaves as if `--auto-decision` was given.
+- A failed scan now removes its temporary clone even in interactive mode.
+- A `requirements.txt` containing bytes that are not valid UTF 8 silently lost all of its dependency findings.
+- Repository names ending in a dotted segment, such as `my.github.io.git`, were mangled by a blanket replace of `.git`. Only a trailing `.git` is stripped now.
+- The GitHub Action examples in the README and `docs/GITHUB_ACTION.md` referenced a `v1` tag that does not exist. They now use `v0.3.1`.
+
 ## [0.3.0] - 2026-09-29
 
 ### Added

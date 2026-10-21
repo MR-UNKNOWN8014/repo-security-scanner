@@ -68,6 +68,23 @@ class TestDependencyChecker(unittest.TestCase):
         self.assertEqual(score, 0)
         self.assertEqual(findings, [])
 
+    def test_non_utf8_requirements_file_is_still_checked(self):
+        (self.repo_path / 'requirements.txt').write_bytes(b'# caf\xe9\nrequests==2.0.0\n')
+        score, findings = self.checker.check_dependencies(self.repo_path)
+        self.assertEqual(len(findings), 1)
+
+    def test_symlinked_requirements_file_is_not_read(self):
+        outside = self.repo_path / 'outside.txt'
+        outside.write_text('requests==2.0.0\n')
+        repo = self.repo_path / 'repo'
+        repo.mkdir()
+        try:
+            (repo / 'requirements.txt').symlink_to(outside)
+        except (OSError, NotImplementedError):
+            self.skipTest('symlinks unavailable')
+        score, findings = self.checker.check_dependencies(repo)
+        self.assertEqual(findings, [])
+
 
 if __name__ == '__main__':
     unittest.main()

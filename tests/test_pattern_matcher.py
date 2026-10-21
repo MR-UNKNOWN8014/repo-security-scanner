@@ -1,3 +1,4 @@
+import time
 import unittest
 from repo_scanner.config import EXTREMELY_LONG_LINE_CHARS, LONG_LINE_CHARS
 from repo_scanner.scanner.pattern_matcher import PatternMatcher
@@ -90,6 +91,21 @@ class TestPatternMatcher(unittest.TestCase):
     def test_network_finding_reports_its_line_number(self):
         findings = self.matcher.detect_network_connections('import requests\nrequests.get(url)\n')
         self.assertEqual(findings[0][1], 2)
+
+    def test_adversarial_single_line_finishes_quickly(self):
+        # unbounded .* between two literals was quadratic on one huge line
+        start = time.time()
+        self.matcher.detect_malicious_patterns('requests.get' * 20000)
+        self.matcher.detect_malicious_patterns('urllib' * 40000)
+        self.assertLess(time.time() - start, 5)
+
+    def test_gapped_pattern_still_matches_nearby_tokens(self):
+        score, findings = self.matcher.detect_malicious_patterns('requests.get(u); requests.post(u, data=d)')
+        self.assertTrue(any(category == 'data_exfiltration' for category, _, _ in findings))
+
+    def test_gapped_pattern_ignores_distant_tokens(self):
+        score, findings = self.matcher.detect_malicious_patterns('telegram' + 'x' * 500 + 'bot')
+        self.assertFalse(any('telegram' in pattern for _, pattern, _ in findings))
 
 
 if __name__ == '__main__':

@@ -41,13 +41,13 @@ class DependencyChecker:
         total_score = 0.0
 
         package_json = repo_path / 'package.json'
-        if package_json.exists():
+        if package_json.is_file() and not package_json.is_symlink():
             score, pkg_findings = self._check_package_json(package_json, online)
             total_score += score
             findings.extend(pkg_findings)
 
         requirements = repo_path / 'requirements.txt'
-        if requirements.exists():
+        if requirements.is_file() and not requirements.is_symlink():
             score, req_findings = self._check_requirements_txt(requirements, online)
             total_score += score
             findings.extend(req_findings)
@@ -112,7 +112,7 @@ class DependencyChecker:
         }
 
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
                 checked = 0
                 for line_number, raw_line in enumerate(f, start=1):
                     line = raw_line.strip()

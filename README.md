@@ -157,7 +157,7 @@ Scan in CI, either your own checkout or a third party repository you are about t
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: MR-UNKNOWN8014/repo-security-scanner@v1
+- uses: MR-UNKNOWN8014/repo-security-scanner@v0.3.1
   with:
     mode: quick
     fail-on: high

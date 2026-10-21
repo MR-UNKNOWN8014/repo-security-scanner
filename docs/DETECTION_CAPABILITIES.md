@@ -53,7 +53,7 @@ Online (`--check-vulns`): queries [OSV.dev](https://osv.dev/) for every pinned d
 
 ## Secret detection
 
-Scans every text file for hardcoded credentials: AWS, GitHub, GitLab, Slack, Google, Stripe, Twilio, and SendGrid keys, private key blocks, JWTs, and generic `api_key` / `secret` / `token` / `password` assignments. Findings report a file and line number, but the value itself is redacted (first and last few characters only). Known placeholder values such as `EXAMPLE`, `changeme`, or `<your_key_here>` are filtered out so docs and templates do not trip it.
+Scans every text file for hardcoded credentials: AWS, GitHub, GitLab, Slack, Google, Stripe, Twilio, and SendGrid keys, private key blocks, JWTs, and generic `api_key` / `secret` / `token` / `password` assignments. Findings report a file and line number, but the value itself is redacted (first four characters only). Known placeholder values such as `EXAMPLE`, `changeme`, or `<your_key_here>` are filtered out so docs and templates do not trip it.
 
 A single confirmed secret pushes that file's risk score into the CRITICAL range on its own.
 

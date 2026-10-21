@@ -50,6 +50,11 @@ class TestFileUtils(unittest.TestCase):
         file_path = self.repo_path / 'main.py'
         self.assertFalse(FileUtils.is_ignored(file_path, self.repo_path, ['*.log']))
 
+    def test_file_under_skip_named_ancestor_is_still_scanned(self):
+        # SKIP_DIRS applies inside the scan root only, never to where the root lives
+        path = self.repo_path / 'build' / 'repo' / 'a.py'
+        self.assertTrue(FileUtils.should_scan_file(path, 'balanced'))
+
 
 if __name__ == '__main__':
     unittest.main()
