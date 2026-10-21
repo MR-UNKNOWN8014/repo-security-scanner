@@ -1,3 +1,4 @@
+import time
 import unittest
 from pathlib import Path
 from repo_scanner.scanner.dockerfile_scanner import DockerfileScanner, is_dockerfile
@@ -112,6 +113,21 @@ class TestDockerfileScanner(unittest.TestCase):
     def test_nonzero_numeric_uid_is_not_flagged_as_root(self):
         score, findings = self.scanner.scan('FROM python:3.12-slim\nUSER 1000\n')
         self.assertFalse(any(f[0] == 'root_user' and f[1] == 'Explicitly runs as root' for f in findings))
+
+    def test_adversarial_lines_finish_quickly(self):
+        start = time.time()
+        self.scanner.scan('FROM python:3.12\nUSER app\nENV ' + 'A' * 200000 + '\n')
+        self.scanner.scan('FROM python:3.12\nUSER app\nENV PASSWORD' + ' ' * 100000 + '\n')
+        self.scanner.scan('FROM python:3.12\nUSER app\nRUN ' + 'curl ' * 20000 + '\n')
+        self.assertLess(time.time() - start, 5)
+
+    def test_hardcoded_secret_in_env_is_still_flagged(self):
+        score, findings = self.scanner.scan('FROM python:3.12\nUSER app\nENV DB_PASSWORD=hunter2hunter2\n')
+        self.assertTrue(any(f[0] == 'hardcoded_secret' for f in findings))
+
+    def test_short_env_value_is_not_flagged_as_secret(self):
+        score, findings = self.scanner.scan('FROM python:3.12\nUSER app\nENV DB_PASSWORD=x\n')
+        self.assertFalse(any(f[0] == 'hardcoded_secret' for f in findings))
 
 
 if __name__ == '__main__':

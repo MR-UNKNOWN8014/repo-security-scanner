@@ -8,6 +8,7 @@ except PackageNotFoundError:
     # running from a source checkout that was never pip installed
     __version__ = "0.0.0+source"
 
+# unbounded .* is quadratic on a hostile single-line file, so gaps are capped
 MALICIOUS_PATTERNS = {
     'crypto_miner': [
         r'cryptonight', r'stratum', r'mining', r'cpuminer',
@@ -16,17 +17,17 @@ MALICIOUS_PATTERNS = {
     'backdoor': [
         r'socket\.bind', r'socket\.connect', r'base64\.b64decode',
         r'exec\(', r'eval\(', r'__import__', r'subprocess\.call',
-        r'os\.system', r'requests\.get.*post', r'urllib.*urlopen'
+        r'os\.system', r'requests\.get.{0,200}post', r'urllib.{0,200}urlopen'
     ],
     'data_exfiltration': [
-        r'requests\.post.*data', r'urllib.*urlopen.*data',
-        r'smtplib', r'email\.send', r'telegram.*bot',
-        r'discord.*webhook', r'slack.*webhook'
+        r'requests\.post.{0,200}data', r'urllib.{0,200}urlopen.{0,200}data',
+        r'smtplib', r'email\.send', r'telegram.{0,200}bot',
+        r'discord.{0,200}webhook', r'slack.{0,200}webhook'
     ],
     'obfuscation': [
         r'base64\.b64encode', r'base64\.b64decode',
         r'zlib\.compress', r'zlib\.decompress',
-        r'__import__.*base64', r'exec\(.*decode'
+        r'__import__.{0,200}base64', r'exec\(.{0,200}decode'
     ],
     'shell_commands': [
         r'subprocess\.', r'os\.popen', r'popen', r'system\('

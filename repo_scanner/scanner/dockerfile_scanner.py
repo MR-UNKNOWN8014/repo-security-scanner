@@ -14,11 +14,11 @@ _FROM_RE = re.compile(r'^\s*FROM\s+(\S+)(?:\s+AS\s+(\S+))?', re.IGNORECASE)
 _ADD_RE = re.compile(r'^\s*ADD\s+(?:--\S+\s+)*(\S+)', re.IGNORECASE)
 _USER_ROOT_RE = re.compile(r'^\s*USER\s+(root|0)(:\S+)?\b', re.IGNORECASE)
 _USER_RE = re.compile(r'^\s*USER\s+\S+', re.IGNORECASE)
-_PIPE_SHELL_RE = re.compile(r'(curl|wget)\s+.*\|\s*(sudo\s+)?(sh|bash)\b', re.IGNORECASE)
-_INSECURE_TLS_RE = re.compile(r'--no-check-certificate|curl\s+.*(-k\b|--insecure)', re.IGNORECASE)
+_PIPE_SHELL_RE = re.compile(r'(curl|wget)\s+.{0,500}\|\s*(sudo\s+)?(sh|bash)\b', re.IGNORECASE)
+_INSECURE_TLS_RE = re.compile(r'--no-check-certificate|curl\s+.{0,500}(-k\b|--insecure)', re.IGNORECASE)
 _ENV_ARG_LINE_RE = re.compile(r'^\s*(?:ENV|ARG)\s+(.*)$', re.IGNORECASE)
 _HARDCODED_SECRET_RE = re.compile(
-    r'(?i)\w*(?:PASSWORD|SECRET|TOKEN|API_KEY)\w*\s*[= ]\s*(\S{8,})'
+    r'(?i)(?:PASSWORD|SECRET|TOKEN|API_KEY)\w{0,64}(?:\s{0,16}=\s{0,16}|\s{1,16})(\S{8,})'
 )
 
 
