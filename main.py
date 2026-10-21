@@ -40,11 +40,14 @@ def main():
         )
         is_local = FileUtils.is_local_path(args.repo_url)
 
-        if args.keep_repo and not args.auto_decision and not is_local:
+        # a prompt would block or crash (EOFError) when there is no terminal
+        auto_decision = args.auto_decision or not sys.stdin.isatty()
+
+        if args.keep_repo and not auto_decision and not is_local:
             print("\nNote: --keep-repo is ignored in interactive mode, your answer below decides.")
 
         print(f"\nStarting scan...")
-        summary = scanner.scan(keep_repo=args.keep_repo, auto_cleanup=args.auto_decision)
+        summary = scanner.scan(keep_repo=args.keep_repo, auto_cleanup=auto_decision)
         
         formatter = ReportFormatter()
         
@@ -66,7 +69,7 @@ def main():
         for message in export_reports(summary, args.output):
             print(f"\n{message}")
         
-        if not args.auto_decision:
+        if not auto_decision:
             decision = handle_decision(summary, is_local)
             if decision:
                 print(f"\nYou chose to proceed with this repository.")
