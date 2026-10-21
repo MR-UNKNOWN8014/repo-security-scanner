@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: MR-UNKNOWN8014/repo-security-scanner@v1
+      - uses: MR-UNKNOWN8014/repo-security-scanner@v0.3.1
         with:
           mode: quick
           fail-on: high
@@ -42,7 +42,7 @@ Vet a dependency or a repository you are about to trust. No checkout needed, the
 
 ```yaml
 - id: scan
-  uses: MR-UNKNOWN8014/repo-security-scanner@v1
+  uses: MR-UNKNOWN8014/repo-security-scanner@v0.3.1
   with:
     repository: https://github.com/some-user/some-repo
     mode: balanced
@@ -56,7 +56,7 @@ Vet a dependency or a repository you are about to trust. No checkout needed, the
 Request SARIF and hand it to the CodeQL upload action. Findings then appear in the repository Security tab with file and line links:
 
 ```yaml
-- uses: MR-UNKNOWN8014/repo-security-scanner@v1
+- uses: MR-UNKNOWN8014/repo-security-scanner@v0.3.1
   with:
     output-sarif: results.sarif
     fail-on: none
