@@ -43,6 +43,10 @@ class TestSecretDetector(unittest.TestCase):
         score, findings = self.detector.detect_secrets('password = "tr0ub4dor&3xyz"')
         self.assertGreater(score, 0)
 
+    def test_redaction_never_reveals_the_tail(self):
+        score, findings = self.detector.detect_secrets('password = "abcdefghi"')
+        self.assertEqual(findings[0][1], 'abcd' + '*' * 5)
+
 
 if __name__ == '__main__':
     unittest.main()

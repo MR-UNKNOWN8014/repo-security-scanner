@@ -15,7 +15,7 @@ def _is_placeholder(value: str) -> bool:
 def _redact(value: str) -> str:
     if len(value) <= 8:
         return '*' * len(value)
-    return f'{value[:4]}{"*" * (len(value) - 8)}{value[-4:]}'
+    return f'{value[:4]}{"*" * (len(value) - 4)}'
 
 
 class SecretDetector:
