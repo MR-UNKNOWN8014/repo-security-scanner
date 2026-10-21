@@ -6,7 +6,6 @@ import os
 import shutil
 import stat
 from typing import List
-from repo_scanner.config import SKIP_DIRS
 
 IGNORE_FILENAME = '.reposecurityignore'
 
@@ -17,10 +16,6 @@ class FileUtils:
 
     @staticmethod
     def should_scan_file(file_path: Path, scan_mode: str) -> bool:
-        for parent in file_path.parents:
-            if parent.name in SKIP_DIRS:
-                return False
-
         if scan_mode == 'quick':
             try:
                 if file_path.stat().st_size > 1024 * 1024:

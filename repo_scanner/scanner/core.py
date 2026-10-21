@@ -24,7 +24,8 @@ class RepoScanner:
         self.scan_mode = scan_mode
         self.verbose = verbose
         self.check_vulns = check_vulns
-        self.repo_name = Path(repo_url.rstrip('/')).resolve().name.replace('.git', '')
+        name = Path(repo_url.rstrip('/')).resolve().name
+        self.repo_name = name[:-4] if name.endswith('.git') else name
         self.repo_path: Optional[Path] = None
         self.ignore_patterns: List[str] = []
 
@@ -48,15 +49,18 @@ class RepoScanner:
                 raise Exception(f"Failed to clone repository: {self.repo_url}")
             print(f"Repository cloned to: {self.repo_path}")
 
-        self.ignore_patterns = self.file_utils.load_ignore_patterns(self.repo_path)
-        if self.ignore_patterns:
-            logger.info(f"Loaded {len(self.ignore_patterns)} ignore pattern(s) from .reposecurityignore")
-
         try:
+            self.ignore_patterns = self.file_utils.load_ignore_patterns(self.repo_path)
+            if self.ignore_patterns:
+                logger.info(f"Loaded {len(self.ignore_patterns)} ignore pattern(s) from .reposecurityignore")
             self._scan_files()
             self._check_dependencies()
             self.summary = self._generate_summary(start_time)
             return self.summary
+        except BaseException:
+            # nothing worth keeping after a failed scan, even in interactive mode
+            self.cleanup()
+            raise
         finally:
             if auto_cleanup and not keep_repo:
                 self.cleanup()
@@ -99,6 +103,10 @@ class RepoScanner:
 
             for file in files:
                 file_path = Path(root) / file
+
+                # a symlink can point outside the scan root, and open() would follow it
+                if file_path.is_symlink():
+                    continue
 
                 if file_path.suffix.lower() in skip_extensions:
                     continue
